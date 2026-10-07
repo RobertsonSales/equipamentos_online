@@ -121,6 +121,7 @@ iframe.pdf{width:100%;height:78vh;border:0;border-radius:0 0 18px 18px;backgroun
 .filters input[type=checkbox]{width:14px;height:14px;min-width:14px;padding:0;margin:0;background:none;border:0;appearance:auto;accent-color:var(--brand);flex:none;cursor:pointer}
 .ms .opts label{display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);padding:5px 6px;border-radius:6px;cursor:pointer;margin:0}
 .ms .opts label:hover{background:#ffffff0d}
+.ms .uopts label{display:flex;flex-wrap:wrap;gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);padding:5px 6px;border-radius:6px;cursor:pointer;margin:0}.ms .uopts label:hover{background:#ffffff0d}.ms .uopts small{flex-basis:100%;margin-left:26px;font-size:11px;color:var(--muted)}.ms .uopts .uhead{font-size:11px;font-weight:700;color:var(--muted);padding:4px 6px;text-transform:uppercase;letter-spacing:.04em}.ms .uopts:not(:empty){border-bottom:1px solid var(--line);margin-bottom:6px;padding-bottom:4px}
 .ms .opts label{flex-wrap:wrap}.ms .opts .uhint{flex-basis:100%;margin-left:26px;font-size:11px;color:var(--muted)}
 .ms .all-options{display:flex;align-items:center;gap:8px;padding:8px 6px;margin:0 0 6px;border-bottom:1px solid var(--line);font-size:13px;color:var(--text);text-transform:none;letter-spacing:0;cursor:pointer}
 .modal .hd{gap:14px;flex-wrap:wrap}.modal .hd h3{flex:1;min-width:180px;overflow-wrap:anywhere}.transfer-search{flex:1;min-width:230px}.transfer-search .suggest{z-index:55}.modal .hd .transfer-search input{width:100%}
@@ -209,7 +210,7 @@ button,input,select,textarea{touch-action:manipulation}button:focus-visible,inpu
 
 <main>
   <div class="filters" id="filters"></div>
-  <details class="chipsbox" id="chipsbox"><summary>Filtros aplicados <span id="chipsCount" class="badge">0</span></summary><div class="chips" id="chips"></div></details>
+  <details class="chipsbox" id="chipsbox" data-collapsed-on-load><summary>Filtros aplicados <span id="chipsCount" class="badge">0</span></summary><div class="chips" id="chips"></div></details>
 
   <section class="kpis" id="kpis"></section>
 
@@ -334,20 +335,31 @@ const FK=FILTERS.map(f=>f[0]);
 const sel=k=>Array.isArray(state.f[k])?state.f[k]:(state.f[k]?[state.f[k]]:[]);
 function toggleF(k,v){ const a=sel(k); state.f[k]=a.includes(v)?a.filter(x=>x!==v):[...a,v]; }
 function uniqFor(k){ if(k!=='UNIDADE'||!sel('CLIENTE').length) return uniq(k); const c=sel('CLIENTE'); return [...new Set(rows.filter(r=>c.includes(String(r.CLIENTE))).map(r=>r.UNIDADE).filter(v=>v!==''&&v!=null))].sort(); }
+function pickUnit(c,u,on){ const own=x=>Object.prototype.hasOwnProperty.call(state.f,x);
+  let C=own('CLIENTE')?[...sel('CLIENTE')]:[], U=own('UNIDADE')?[...sel('UNIDADE')]:null;
+  const unitsOf=l=>[...new Set(l.flatMap(clientUnits))];
+  if(on){ if(!C.includes(c)){ if(U===null) U=unitsOf(C); C.push(c); } else if(U===null) return; if(!U.includes(u)) U.push(u); }
+  else { if(!C.includes(c)) return; if(U===null) U=unitsOf(C); U=U.filter(x=>x!==u); if(!clientUnits(c).some(x=>U.includes(x))) C=C.filter(x=>x!==c); }
+  if(!C.length){ delete state.f.CLIENTE; delete state.f.UNIDADE; } else { state.f.CLIENTE=C; state.f.UNIDADE=U; } }
 function clientUnits(c){ return [...new Set(rows.filter(r=>String(r.CLIENTE)===String(c)).map(r=>r.UNIDADE).filter(v=>v!==''&&v!=null).map(String))].sort(); }
 document.addEventListener('click',e=>{ document.querySelectorAll('.ms.open').forEach(m=>{ if(!m.contains(e.target)){ m.classList.remove('open'); if(m._dirty){ buildFilters(); render(); } } }); });
 function buildFilters(){
   $('#filters').innerHTML = FILTERS.map(([k,l])=>{ const a=Object.prototype.hasOwnProperty.call(state.f,k)?sel(k):uniqFor(k).map(String); const lab=a.length?(a.length===1?(k==='_status'?ST[a[0]]:a[0]):a.length+' selecionados'):(Object.prototype.hasOwnProperty.call(state.f,k)?'Nenhum':'Todos');
-    return `<div><label>${l}</label><div class="ms" data-k="${k}"><button type="button">${esc(lab)} ▾</button><div class="pop"><input type="search" placeholder="Buscar…"><label class="all-options"><input type="checkbox" data-all aria-label="Marcar/desmarcar todas as opções de ${l}">Marcar/desmarcar todas</label><div class="opts">${uniqFor(k).map(v=>`<label data-n="${esc(norm(k==='_status'?ST[v]:v)+(k==='CLIENTE'?' '+clientUnits(v).map(norm).join(' '):''))}" ${k==='CLIENTE'?`data-u="${esc(clientUnits(v).join('|'))}" data-c="${esc(norm(v))}"`:''}><input type="checkbox" value="${esc(v)}" ${a.includes(String(v))?'checked':''}>${esc(k==='_status'?ST[v]:v)}</label>`).join('')}</div><div class="acts"><button type="button" class="btn sm" data-a="clr">Limpar</button><button type="button" class="btn sm primary" data-a="ok">Aplicar</button></div></div></div></div>`; }).join('')
+    return `<div><label>${l}</label><div class="ms" data-k="${k}"><button type="button">${esc(lab)} ▾</button><div class="pop"><input type="search" placeholder="Buscar…"><label class="all-options"><input type="checkbox" data-all aria-label="Marcar/desmarcar todas as opções de ${l}">Marcar/desmarcar todas</label><div class="uopts"></div><div class="opts">${uniqFor(k).map(v=>`<label data-n="${esc(norm(k==='_status'?ST[v]:v))}"><input type="checkbox" value="${esc(v)}" ${a.includes(String(v))?'checked':''}>${esc(k==='_status'?ST[v]:v)}</label>`).join('')}</div><div class="acts"><button type="button" class="btn sm" data-a="clr">Limpar</button><button type="button" class="btn sm primary" data-a="ok">Aplicar</button></div></div></div></div>`; }).join('')
    + `<div><label>Próx. preventiva de</label><input type="date" data-k="_de" value="${state.f._de||''}"></div><div><label>até</label><input type="date" data-k="_ate" value="${state.f._ate||''}"></div>`;
   $('#filters').querySelectorAll('input[type=date]').forEach(el=>el.onchange=()=>{ state.f[el.dataset.k]=el.value; render(); });
   $('#filters').querySelectorAll('.ms').forEach(m=>{ const k=m.dataset.k;
     m.querySelector(':scope>button').onclick=()=>{ const o=m.classList.contains('open'); document.querySelectorAll('.ms.open').forEach(x=>x!==m&&x.classList.remove('open')); m.classList.toggle('open',!o); if(!o) m.querySelector('input[type=search]').focus(); };
+    const uo=m.querySelector('.uopts');
+    const renderUnitHits=ts=>{ uo.innerHTML=''; if(k!=='CLIENTE'||!ts.length) return; const hits=[];
+      uniqFor('CLIENTE').forEach(c=>{ const cn=norm(c); if(ts.every(t=>cn.includes(t))) return;
+        clientUnits(c).forEach(u=>{ const un=norm(u); if(ts.some(t=>un.includes(t))&&ts.every(t=>(cn+' '+un).includes(t))) hits.push([c,u]); }); });
+      const hasC=Object.prototype.hasOwnProperty.call(state.f,'CLIENTE'), hasU=Object.prototype.hasOwnProperty.call(state.f,'UNIDADE');
+      uo.innerHTML=hits.length?`<div class="uhead">Unidades encontradas</div>`+hits.slice(0,30).map(([c,u])=>`<label><input type="checkbox" data-uc="${esc(c)}" data-uu="${esc(u)}" ${hasC&&sel('CLIENTE').includes(c)&&(!hasU||sel('UNIDADE').includes(u))?'checked':''}>${esc(u)}<small>${esc(c)}</small></label>`).join(''):'';
+      uo.querySelectorAll('input').forEach(c=>c.onchange=()=>{ pickUnit(c.dataset.uc,c.dataset.uu,c.checked); options.forEach(o=>o.checked=sel('CLIENTE').includes(o.value)); syncAll(); m._dirty=true; render(); }); };
     m.querySelector('input[type=search]').oninput=e=>{ const ts=norm(e.target.value).split(/\s+/).filter(Boolean);
-      m.querySelectorAll('.opts label').forEach(l=>{ const hit=ts.every(t=>l.dataset.n.includes(t)); l.style.display=hit?'':'none';
-        const old=l.querySelector('.uhint'); if(old) old.remove();
-        if(hit&&ts.length&&l.dataset.u!==undefined&&!ts.every(t=>l.dataset.c.includes(t))){
-          const us=l.dataset.u.split('|').filter(u=>ts.every(t=>norm(u).includes(t))); if(us.length){ const h=document.createElement('small'); h.className='uhint'; h.textContent='↳ unidade: '+us.slice(0,3).join(', ')+(us.length>3?' +'+(us.length-3):''); l.appendChild(h); } } }); };
+      m.querySelectorAll('.opts label').forEach(l=>l.style.display=ts.every(t=>l.dataset.n.includes(t))?'':'none');
+      renderUnitHits(ts); syncAll(); };
     const all=m.querySelector('[data-all]'), options=[...m.querySelectorAll('.opts input')];
     const syncAll=()=>{ const n=options.filter(c=>c.checked).length; all.checked=options.length>0&&n===options.length; all.indeterminate=n>0&&n<options.length; all.disabled=!options.length; };
     const updateSelection=()=>{ state.f[k]=options.filter(c=>c.checked).map(c=>c.value); m._dirty=true; syncAll(); render(); };
@@ -360,12 +372,16 @@ function buildFilters(){
 function parseQuery(q){
   const terms=[], fields={};
   q.replace(/(\w+):("[^"]+"|\S+)|("[^"]+"|\S+)/g,(m,k,v,t)=>{
-    if(k && ALIAS[norm(k)]) fields[ALIAS[norm(k)]]=norm(v.replace(/"/g,'')); else terms.push(norm((t||m).replace(/"/g,'')));
+    if(k && ALIAS[norm(k)]) (fields[ALIAS[norm(k)]]??=[]).push({v:norm(v.replace(/"/g,'')),quoted:v[0]==='"'}); else terms.push(norm((t||m).replace(/"/g,'')));
   });
   return {terms,fields};
 }
 function filtered(){
   const {terms,fields}=parseQuery(state.q);
+  /* valor vindo de sugestão (entre aspas) que existe na base => igualdade exata */
+  for(const [k,l] of Object.entries(fields)) l.forEach(f=>{ f.exact = k!=='_status' && f.quoted && rows.some(x=>norm(x[k])===f.v); });
+  /* várias palavras livres: tenta como frase dentro de uma única coluna antes de espalhar pelos campos */
+  const phrase=terms.join(' '); const phraseMode = terms.length>1 && rows.some(r=>COLS.some(c=>norm(r[c]).includes(phrase)));
   return rows.filter(r=>{
     for(const [k,v] of Object.entries(state.f)){
       if(FK.includes(k)&&Array.isArray(v)&&!v.length) return false;
@@ -376,10 +392,11 @@ function filtered(){
       if(k==='_status'){ if(status(r)!==v) return false; continue; }
       if(String(r[k])!==v) return false;
     }
-    for(const [k,v] of Object.entries(fields)){
+    for(const [k,l] of Object.entries(fields)){
       const val = k==='_status' ? norm(status(r)+' '+ST[status(r)]) : norm(r[k]);
-      if(!val.includes(v)) return false;
+      if(!l.some(f=>f.exact?val===f.v:val.includes(f.v))) return false;
     }
+    if(phraseMode) return COLS.some(c=>norm(r[c]).includes(phrase)) || norm(ST[status(r)]).includes(phrase);
     const hay = norm(COLS.map(c=>r[c]).join(' ')+' '+ST[status(r)]);
     return terms.every(t=>hay.includes(t));
   });
@@ -389,7 +406,10 @@ function chips(){
   if(state.q) c.push(['q',`Busca: “${state.q}”`]);
   for(const [k,v] of Object.entries(state.f)){ if(FK.includes(k)){ if(!sel(k).length)c.push([k,`${FILTERS.find(f=>f[0]===k)[1]}: Nenhum`]); sel(k).forEach(x=>c.push([k,`${FILTERS.find(f=>f[0]===k)[1]}: ${k==='_status'?ST[x]:x}`,x])); } else if(v) c.push([k,`${k==='_de'?'De':'Até'}: ${br(v)}`]); }
   $('#chips').innerHTML = c.map(([k,l,x])=>`<span class="chip" data-k="${k}" data-v="${esc(x??'')}">${esc(l)} ✕</span>`).join('') + (c.length?`<span class="chip" data-k="*">Limpar tudo</span>`:''); $('#chipsCount').textContent=c.length; $('#chips').innerHTML||($('#chips').innerHTML='<span class="muted" style="font-size:12px;color:var(--muted)">Nenhum filtro marcado</span>');
-  $('#chips').querySelectorAll('.chip').forEach(el=>el.onclick=()=>{ const k=el.dataset.k; if(k==='*'){state.f={};state.q='';} else if(k==='q') state.q=''; else if(FK.includes(k)){ if(!sel(k).length) delete state.f[k]; else state.f[k]=sel(k).filter(x=>x!==el.dataset.v); } else state.f[k]=''; $('#q').value=state.q; buildFilters(); render(); });
+  $('#chips').querySelectorAll('.chip').forEach(el=>el.onclick=()=>{ const k=el.dataset.k; if(k==='*'){state.f={};state.q='';} else if(k==='q') state.q=''; else if(FK.includes(k)){ if(!sel(k).length) delete state.f[k]; else state.f[k]=sel(k).filter(x=>x!==el.dataset.v);
+      const hasU=Object.prototype.hasOwnProperty.call(state.f,'UNIDADE'), hasC=Object.prototype.hasOwnProperty.call(state.f,'CLIENTE');
+      if(k==='CLIENTE'&&hasU){ const rm=clientUnits(el.dataset.v); state.f.UNIDADE=sel('UNIDADE').filter(u=>!rm.includes(u)); if(!sel('CLIENTE').length){ delete state.f.CLIENTE; delete state.f.UNIDADE; } }
+      if(k==='UNIDADE'&&Array.isArray(state.f.UNIDADE)){ const U=sel('UNIDADE'); if(hasC){ const C=sel('CLIENTE').filter(c=>clientUnits(c).some(u=>U.includes(u))); if(C.length) state.f.CLIENTE=C; else { delete state.f.CLIENTE; delete state.f.UNIDADE; } } else if(!U.length) delete state.f.UNIDADE; } } else state.f[k]=''; $('#q').value=state.q; buildFilters(); render(); });
 }
 
 /* Sugestões da busca */
@@ -400,14 +420,22 @@ q.addEventListener('keydown',e=>{ const it=[...sg.children]; if(!it.length) retu
   it.forEach((x,i)=>x.classList.toggle('act',i===sIdx)); e.preventDefault(); });
 q.addEventListener('blur',()=>setTimeout(()=>sg.style.display='none',150));
 function suggest(){
-  const last = norm(q.value.split(/\s+/).pop()); sIdx=-1;
-  if(last.length<2 || last.includes(':')){ sg.style.display='none'; return; }
-  const out=[];
-  [["CLIENTE","cliente"],["UNIDADE","unidade"],["EQUIPAMENTO","equipamento"],["CATEGORIA","categoria"],["RESPONSAVÉL","responsavel"],["SERIAL","serial"]].forEach(([k,a])=>
-    uniq(k).forEach(v=>{ if(norm(v).includes(last)) out.push([a,v]); }));
-  sg.innerHTML = out.slice(0,10).map(([a,v])=>`<div data-v='${a}:"${esc(v)}"'><span>${esc(v)}</span><small>${a}</small></div>`).join('');
+  sIdx=-1; const val=q.value; const toks=[]; val.replace(/(\w+):("[^"]+"|\S+)|("[^"]+"|\S+)/g,(m,k,v,t,idx)=>{ toks.push({free:!(k&&ALIAS[norm(k)]),text:(t||m).replace(/"/g,''),idx}); });
+  let run=[]; for(let n=toks.length-1;n>=0&&toks[n].free&&run.length<6;n--) run.unshift(toks[n]);
+  if(/\s$/.test(val)||!run.length){ sg.style.display='none'; return; }
+  let start=run[0].idx, phrase=norm(run.map(x=>x.text).join(' '));
+  const find=ph=>{ const o=[]; const add=(a,v,ins,sub)=>{ if(norm(v).includes(ph)) o.push({a,v,ins,sub}); };
+    uniq('CLIENTE').forEach(c=>add('cliente',c,`cliente:"${c}"`,'cliente'));
+    const pu=new Set(); rows.forEach(r=>{ if(r.UNIDADE!==''&&r.UNIDADE!=null){ const key=r.CLIENTE+'|'+r.UNIDADE; if(!pu.has(key)){ pu.add(key); add('unidade',r.UNIDADE,`cliente:"${r.CLIENTE}" unidade:"${r.UNIDADE}"`,'unidade · '+r.CLIENTE); } } });
+    [["EQUIPAMENTO","equipamento"],["CATEGORIA","categoria"],["RESPONSAVÉL","responsavel"],["SERIAL","serial"]].forEach(([k,a])=>uniq(k).forEach(v=>add(a,String(v),`${a}:"${v}"`,a)));
+    return o; };
+  let out=find(phrase);
+  if(!out.length&&run.length>1){ const lw=run[run.length-1]; start=lw.idx; out=find(norm(lw.text)); }
+  if(norm(run[run.length-1].text).length<2&&run.length===1) out=[];
+  const per={}; out=out.filter(o=>(per[o.a]=(per[o.a]||0)+1)<=5);
+  sg.innerHTML = out.map(o=>`<div data-ins="${esc(o.ins)}"><span>${esc(o.v)}</span><small>${esc(o.sub)}</small></div>`).join('');
   sg.style.display = out.length?'block':'none';
-  [...sg.children].forEach(d=>d.onclick=()=>{ const parts=q.value.split(/\s+/); parts.pop(); parts.push(d.dataset.v); q.value=parts.join(' ').trim()+' '; state.q=q.value.trim(); sg.style.display='none'; q.focus(); render(); });
+  [...sg.children].forEach(d=>d.onclick=()=>{ q.value=(val.slice(0,start)+d.dataset.ins).trim()+' '; state.q=q.value.trim(); sg.style.display='none'; q.focus(); render(); });
 }
 
 /* ======================= RENDER ======================= */
@@ -693,6 +721,7 @@ function buildPdf(){
 function openPdf(){ busy(true); setTimeout(()=>{ pdfDoc=buildPdf(); $('#pdfFrame').src=pdfDoc.output('bloburl'); $('#mPdf').classList.add('open'); busy(false); },30); }
 function downloadPdf(){ pdfDoc && pdfDoc.save(`patrimonio_${new Date().toISOString().slice(0,10)}.pdf`); }
 
+$('#chipsbox').open=false;
 reload();
 </script>
 </body>
