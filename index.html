@@ -115,6 +115,7 @@ iframe.pdf{width:100%;height:78vh;border:0;border-radius:0 0 18px 18px;backgroun
 .ms.open .pop{display:block}
 .ms .pop input[type=search]{width:100%;padding:7px 9px;border-radius:8px;border:1px solid var(--line);background:var(--panel);margin-bottom:6px}
 .ms .opts{max-height:240px;overflow:auto}
+.filters input[type=checkbox]{width:14px;height:14px;min-width:14px;padding:0;margin:0;background:none;border:0;appearance:auto;accent-color:var(--brand);flex:none;cursor:pointer}
 .ms .opts label{display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);padding:5px 6px;border-radius:6px;cursor:pointer;margin:0}
 .ms .opts label:hover{background:#ffffff0d}
 .ms .acts{display:flex;justify-content:space-between;margin-top:6px}
@@ -206,6 +207,7 @@ const SEED = [{"ID": "demo-0", "REGIÃO": "ZONA NORTE", "CATEGORIA": "URINÁLISE
 const COLS = ["REGIÃO","CATEGORIA","INSTALAÇÃO","UNIDADE","EQUIPAMENTO","SERIAL","CD PAT","SETOR","TEC","CLIENTE","PREV. ATUAL","PROX.","RESPONSAVÉL","TROCA DE LÂMP","TROCA DE PROB","TROCA REFER","TROCA DA LS","OBS","LOCAÇÃO R$","CNPJ"];
 const DATE_COLS = ["INSTALAÇÃO","PREV. ATUAL","PROX."];
 const TABLE_COLS = ["CLIENTE","UNIDADE","CATEGORIA","EQUIPAMENTO","SERIAL","CD PAT","RESPONSAVÉL","PREV. ATUAL","PROX.","REGIÃO"];
+const FORM_COLS=(()=>{const a=COLS.filter(c=>c!=="UNIDADE");a.splice(a.indexOf("EQUIPAMENTO"),0,"UNIDADE");return a;})();
 const ALIAS = {cliente:"CLIENTE",unidade:"UNIDADE",categoria:"CATEGORIA",cat:"CATEGORIA",equipamento:"EQUIPAMENTO",eq:"EQUIPAMENTO",serial:"SERIAL",pat:"CD PAT",patrimonio:"CD PAT",responsavel:"RESPONSAVÉL",resp:"RESPONSAVÉL",regiao:"REGIÃO",cnpj:"CNPJ",status:"_status"};
 const ST = {vencida:"Vencida",proxima:"Vence em 30d",emdia:"Em dia",sem:"Sem data"};
 
@@ -413,9 +415,10 @@ function renderTable(d){
 function openForm(r){
   current = r||null; $('#fTitle').textContent = r?`Editar · ${r.EQUIPAMENTO}`:'Novo equipamento'; $('#fDel').style.display=r?'':'none';
   const one=k=>sel(k).length===1?sel(k)[0]:''; const base = r || {CLIENTE:one('CLIENTE'),UNIDADE:one('UNIDADE'),REGIÃO:one('REGIÃO')};
-  $('#fBody').innerHTML = COLS.map(c=>`<div class="field"><label>${c}</label><input name="${c}" ${DATE_COLS.includes(c)?'type="date"':''} list="dl-${norm(c).replace(/\W/g,'')}" value="${esc(base[c]??'')}" ${['CLIENTE','UNIDADE','EQUIPAMENTO'].includes(c)?'required':''}></div>`).join('')
+  $('#fBody').innerHTML = FORM_COLS.map(c=>`<div class="field"><label>${c}</label><input name="${c}" ${DATE_COLS.includes(c)?'type="date"':''} list="dl-${norm(c).replace(/\W/g,'')}" value="${esc(base[c]??'')}" ${['CLIENTE','UNIDADE','EQUIPAMENTO'].includes(c)?'required':''}></div>`).join('')
     + ["CLIENTE","UNIDADE","CATEGORIA","RESPONSAVÉL","REGIÃO","EQUIPAMENTO"].map(c=>`<datalist id="dl-${norm(c).replace(/\W/g,'')}">${uniq(c).map(v=>`<option value="${esc(v)}">`).join('')}</datalist>`).join('');
   const uIn=$('#fBody [name="UNIDADE"]'); uIn.removeAttribute('list'); uIn.autocomplete='off'; uIn.placeholder='Busque a unidade de destino…';
+  uIn.removeAttribute('required'); uIn.dataset.orig=String(base.UNIDADE??''); uIn.dataset.touched='0'; uIn.value='';
   const wrap=uIn.parentElement; wrap.classList.add('ac'); wrap.querySelector('label').textContent='UNIDADE (transferência – busca inteligente)';
   const usg=document.createElement('div'); usg.className='suggest'; wrap.appendChild(usg);
   const units=()=>{ const m={}; rows.forEach(x=>{ if(x.UNIDADE!==''&&x.UNIDADE!=null){ const key=x.UNIDADE+'|'+x.CLIENTE; m[key]??={u:x.UNIDADE,c:x.CLIENTE,cnpj:x.CNPJ,reg:x['REGIÃO']}; } }); return Object.values(m); };
@@ -423,13 +426,14 @@ function openForm(r){
     usg.innerHTML=L.map((o,i)=>`<div data-i="${i}"><span>${esc(o.u)}</span><small>${esc(o.c)}</small></div>`).join(''); usg.style.display=L.length?'block':'none';
     [...usg.children].forEach(d=>d.onmousedown=ev=>{ ev.preventDefault(); const o=L[+d.dataset.i]; uIn.value=o.u; const F=n=>$(`#fBody [name="${n}"]`);
       F('CLIENTE').value=o.c; if(o.cnpj) F('CNPJ').value=o.cnpj; if(o.reg) F('REGIÃO').value=o.reg; usg.style.display='none'; toast(`Unidade ${o.u} → cliente ${o.c}`); }); };
-  uIn.addEventListener('input',showU); uIn.addEventListener('focus',showU); uIn.addEventListener('blur',()=>setTimeout(()=>usg.style.display='none',150));
+  uIn.addEventListener('input',()=>uIn.dataset.touched='1'); uIn.addEventListener('input',showU); uIn.addEventListener('focus',showU); uIn.addEventListener('blur',()=>setTimeout(()=>usg.style.display='none',150));
   const prev=$('#fBody [name="PREV. ATUAL"]'), prox=$('#fBody [name="PROX."]');
   prev.addEventListener('change',()=>{ if(prev.value && !prox.value){ const d=pd(prev.value); d.setDate(d.getDate()+180); prox.value=d.toISOString().slice(0,10); toast('Próxima preventiva sugerida: +180 dias'); }});
   $('#mForm').classList.add('open');
 }
 async function saveForm(e){
   e.preventDefault(); const rec={...(current||{})}; new FormData($('#form')).forEach((v,k)=>rec[k]=String(v).trim());
+  { const u=$('#fBody [name="UNIDADE"]'); if(u&&u.dataset.touched!=='1') rec.UNIDADE=u.dataset.orig||''; }
   if(rec.SERIAL && rows.some(r=>r.ID!==rec.ID && String(r.SERIAL)===rec.SERIAL) && !confirm('Já existe um equipamento com este serial. Salvar mesmo assim?')) return;
   busy(true);
   try{ await api('POST',{action:current?'update':'create',record:rec}); closeM('mForm'); toast(current?'Registro atualizado':'Registro criado'); await reload(); }
