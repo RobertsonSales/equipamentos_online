@@ -10,8 +10,18 @@ function getToken_() {
   return PropertiesService.getScriptProperties().getProperty('API_TOKEN') || '';
 }
 
+function spreadsheet_() {
+  // Script vinculado à planilha (Extensões › Apps Script): getActive() funciona.
+  // Script avulso: defina a propriedade SHEET_ID (ID da planilha) em Propriedades do script.
+  const active = SpreadsheetApp.getActive();
+  if (active) return active;
+  const id = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+  if (!id) throw new Error('Script avulso: defina a propriedade SHEET_ID com o ID da planilha');
+  return SpreadsheetApp.openById(id);
+}
+
 function sheet_() {
-  const sh = SpreadsheetApp.getActive().getSheetByName(SHEET_NAME);
+  const sh = spreadsheet_().getSheetByName(SHEET_NAME);
   if (!sh) throw new Error('Aba "' + SHEET_NAME + '" não encontrada');
   const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
   if (headers[0] !== ID_COL) {
