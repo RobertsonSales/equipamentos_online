@@ -48,7 +48,7 @@ main{padding:24px 28px 60px;max-width:1500px;margin:0 auto}
 .filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:18px 0}
 .filters select,.filters input{width:100%;padding:9px 11px;border-radius:10px;border:1px solid var(--line);background:var(--panel)}
 .filters label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);display:block;margin-bottom:5px}
-.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px 12px}.chipsbox{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:14px}.chipsbox summary{cursor:pointer;padding:10px 12px;font-size:13px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:8px;user-select:none}.chipsbox summary::marker{color:var(--brand)}.chipsbox:not([open]) .chips{display:none}
 .chip{font-size:12px;background:#14b8a61a;border:1px solid #14b8a655;color:#5eead4;padding:4px 10px;border-radius:99px;cursor:pointer}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
 .kpi{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;position:relative;overflow:hidden;cursor:pointer;transition:.15s}
@@ -208,7 +208,7 @@ button,input,select,textarea{touch-action:manipulation}button:focus-visible,inpu
 
 <main>
   <div class="filters" id="filters"></div>
-  <div class="chips" id="chips"></div>
+  <details class="chipsbox" id="chipsbox"><summary>Filtros aplicados <span id="chipsCount" class="badge">0</span></summary><div class="chips" id="chips"></div></details>
 
   <section class="kpis" id="kpis"></section>
 
@@ -382,7 +382,7 @@ function chips(){
   const c=[];
   if(state.q) c.push(['q',`Busca: “${state.q}”`]);
   for(const [k,v] of Object.entries(state.f)){ if(FK.includes(k)){ if(!sel(k).length)c.push([k,`${FILTERS.find(f=>f[0]===k)[1]}: Nenhum`]); sel(k).forEach(x=>c.push([k,`${FILTERS.find(f=>f[0]===k)[1]}: ${k==='_status'?ST[x]:x}`,x])); } else if(v) c.push([k,`${k==='_de'?'De':'Até'}: ${br(v)}`]); }
-  $('#chips').innerHTML = c.map(([k,l,x])=>`<span class="chip" data-k="${k}" data-v="${esc(x??'')}">${esc(l)} ✕</span>`).join('') + (c.length?`<span class="chip" data-k="*">Limpar tudo</span>`:'');
+  $('#chips').innerHTML = c.map(([k,l,x])=>`<span class="chip" data-k="${k}" data-v="${esc(x??'')}">${esc(l)} ✕</span>`).join('') + (c.length?`<span class="chip" data-k="*">Limpar tudo</span>`:''); $('#chipsCount').textContent=c.length; $('#chips').innerHTML||($('#chips').innerHTML='<span class="muted" style="font-size:12px;color:var(--muted)">Nenhum filtro marcado</span>');
   $('#chips').querySelectorAll('.chip').forEach(el=>el.onclick=()=>{ const k=el.dataset.k; if(k==='*'){state.f={};state.q='';} else if(k==='q') state.q=''; else if(FK.includes(k)){ if(!sel(k).length) delete state.f[k]; else state.f[k]=sel(k).filter(x=>x!==el.dataset.v); } else state.f[k]=''; $('#q').value=state.q; buildFilters(); render(); });
 }
 
