@@ -121,6 +121,7 @@ iframe.pdf{width:100%;height:78vh;border:0;border-radius:0 0 18px 18px;backgroun
 .filters input[type=checkbox]{width:14px;height:14px;min-width:14px;padding:0;margin:0;background:none;border:0;appearance:auto;accent-color:var(--brand);flex:none;cursor:pointer}
 .ms .opts label{display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);padding:5px 6px;border-radius:6px;cursor:pointer;margin:0}
 .ms .opts label:hover{background:#ffffff0d}
+.ms .opts label{flex-wrap:wrap}.ms .opts .uhint{flex-basis:100%;margin-left:26px;font-size:11px;color:var(--muted)}
 .ms .all-options{display:flex;align-items:center;gap:8px;padding:8px 6px;margin:0 0 6px;border-bottom:1px solid var(--line);font-size:13px;color:var(--text);text-transform:none;letter-spacing:0;cursor:pointer}
 .modal .hd{gap:14px;flex-wrap:wrap}.modal .hd h3{flex:1;min-width:180px;overflow-wrap:anywhere}.transfer-search{flex:1;min-width:230px}.transfer-search .suggest{z-index:55}.modal .hd .transfer-search input{width:100%}
 .ms .acts{display:flex;justify-content:space-between;margin-top:6px}
@@ -333,22 +334,27 @@ const FK=FILTERS.map(f=>f[0]);
 const sel=k=>Array.isArray(state.f[k])?state.f[k]:(state.f[k]?[state.f[k]]:[]);
 function toggleF(k,v){ const a=sel(k); state.f[k]=a.includes(v)?a.filter(x=>x!==v):[...a,v]; }
 function uniqFor(k){ if(k!=='UNIDADE'||!sel('CLIENTE').length) return uniq(k); const c=sel('CLIENTE'); return [...new Set(rows.filter(r=>c.includes(String(r.CLIENTE))).map(r=>r.UNIDADE).filter(v=>v!==''&&v!=null))].sort(); }
+function clientUnits(c){ return [...new Set(rows.filter(r=>String(r.CLIENTE)===String(c)).map(r=>r.UNIDADE).filter(v=>v!==''&&v!=null).map(String))].sort(); }
 document.addEventListener('click',e=>{ document.querySelectorAll('.ms.open').forEach(m=>{ if(!m.contains(e.target)){ m.classList.remove('open'); if(m._dirty){ buildFilters(); render(); } } }); });
 function buildFilters(){
   $('#filters').innerHTML = FILTERS.map(([k,l])=>{ const a=Object.prototype.hasOwnProperty.call(state.f,k)?sel(k):uniqFor(k).map(String); const lab=a.length?(a.length===1?(k==='_status'?ST[a[0]]:a[0]):a.length+' selecionados'):(Object.prototype.hasOwnProperty.call(state.f,k)?'Nenhum':'Todos');
-    return `<div><label>${l}</label><div class="ms" data-k="${k}"><button type="button">${esc(lab)} ▾</button><div class="pop"><input type="search" placeholder="Buscar…"><label class="all-options"><input type="checkbox" data-all aria-label="Marcar/desmarcar todas as opções de ${l}">Marcar/desmarcar todas</label><div class="opts">${uniqFor(k).map(v=>`<label data-n="${esc(norm(k==='_status'?ST[v]:v))}"><input type="checkbox" value="${esc(v)}" ${a.includes(String(v))?'checked':''}>${esc(k==='_status'?ST[v]:v)}</label>`).join('')}</div><div class="acts"><button type="button" class="btn sm" data-a="clr">Limpar</button><button type="button" class="btn sm primary" data-a="ok">Aplicar</button></div></div></div></div>`; }).join('')
+    return `<div><label>${l}</label><div class="ms" data-k="${k}"><button type="button">${esc(lab)} ▾</button><div class="pop"><input type="search" placeholder="Buscar…"><label class="all-options"><input type="checkbox" data-all aria-label="Marcar/desmarcar todas as opções de ${l}">Marcar/desmarcar todas</label><div class="opts">${uniqFor(k).map(v=>`<label data-n="${esc(norm(k==='_status'?ST[v]:v)+(k==='CLIENTE'?' '+clientUnits(v).map(norm).join(' '):''))}" ${k==='CLIENTE'?`data-u="${esc(clientUnits(v).join('|'))}" data-c="${esc(norm(v))}"`:''}><input type="checkbox" value="${esc(v)}" ${a.includes(String(v))?'checked':''}>${esc(k==='_status'?ST[v]:v)}</label>`).join('')}</div><div class="acts"><button type="button" class="btn sm" data-a="clr">Limpar</button><button type="button" class="btn sm primary" data-a="ok">Aplicar</button></div></div></div></div>`; }).join('')
    + `<div><label>Próx. preventiva de</label><input type="date" data-k="_de" value="${state.f._de||''}"></div><div><label>até</label><input type="date" data-k="_ate" value="${state.f._ate||''}"></div>`;
   $('#filters').querySelectorAll('input[type=date]').forEach(el=>el.onchange=()=>{ state.f[el.dataset.k]=el.value; render(); });
   $('#filters').querySelectorAll('.ms').forEach(m=>{ const k=m.dataset.k;
     m.querySelector(':scope>button').onclick=()=>{ const o=m.classList.contains('open'); document.querySelectorAll('.ms.open').forEach(x=>x!==m&&x.classList.remove('open')); m.classList.toggle('open',!o); if(!o) m.querySelector('input[type=search]').focus(); };
-    m.querySelector('input[type=search]').oninput=e=>{ const t=norm(e.target.value); m.querySelectorAll('.opts label').forEach(l=>l.style.display=l.dataset.n.includes(t)?'':'none'); };
+    m.querySelector('input[type=search]').oninput=e=>{ const ts=norm(e.target.value).split(/\s+/).filter(Boolean);
+      m.querySelectorAll('.opts label').forEach(l=>{ const hit=ts.every(t=>l.dataset.n.includes(t)); l.style.display=hit?'':'none';
+        const old=l.querySelector('.uhint'); if(old) old.remove();
+        if(hit&&ts.length&&l.dataset.u!==undefined&&!ts.every(t=>l.dataset.c.includes(t))){
+          const us=l.dataset.u.split('|').filter(u=>ts.every(t=>norm(u).includes(t))); if(us.length){ const h=document.createElement('small'); h.className='uhint'; h.textContent='↳ unidade: '+us.slice(0,3).join(', ')+(us.length>3?' +'+(us.length-3):''); l.appendChild(h); } } }); };
     const all=m.querySelector('[data-all]'), options=[...m.querySelectorAll('.opts input')];
     const syncAll=()=>{ const n=options.filter(c=>c.checked).length; all.checked=options.length>0&&n===options.length; all.indeterminate=n>0&&n<options.length; all.disabled=!options.length; };
     const updateSelection=()=>{ state.f[k]=options.filter(c=>c.checked).map(c=>c.value); m._dirty=true; syncAll(); render(); };
-    all.onchange=()=>{ options.forEach(c=>c.checked=all.checked); updateSelection(); };
+    all.onchange=()=>{ options.forEach(c=>{ if(c.parentElement.style.display!=='none') c.checked=all.checked; }); updateSelection(); };
     options.forEach(c=>c.onchange=updateSelection); syncAll();
     m.querySelector('[data-a=clr]').onclick=()=>{ delete state.f[k]; if(k==='CLIENTE') delete state.f.UNIDADE; buildFilters(); render(); };
-    m.querySelector('[data-a=ok]').onclick=()=>{ m.classList.remove('open'); if(k==='CLIENTE'){ const ok=uniqFor('UNIDADE'); state.f.UNIDADE=sel('UNIDADE').filter(u=>ok.map(String).includes(u)); } buildFilters(); render(); };
+    m.querySelector('[data-a=ok]').onclick=()=>{ m.classList.remove('open'); if(k==='CLIENTE'&&Object.prototype.hasOwnProperty.call(state.f,'UNIDADE')&&sel('UNIDADE').length){ const ok=uniqFor('UNIDADE').map(String), keep=sel('UNIDADE').filter(u=>ok.includes(u)); if(keep.length) state.f.UNIDADE=keep; else delete state.f.UNIDADE; } buildFilters(); render(); };
   });
 }
 function parseQuery(q){
