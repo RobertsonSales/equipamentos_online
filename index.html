@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<script>
+(()=>{let theme;try{theme=localStorage.getItem('pat_theme')}catch{}document.documentElement.dataset.theme=['light','dark'].includes(theme)?theme:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');})();
+</script>
 <title>GRUPO LABMEDIC – Controle do inventário de equipamentos</title>
 <meta name="description" content="Dashboard e CRUD de patrimônio de equipamentos laboratoriais integrado ao Google Sheets." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -124,7 +127,60 @@ iframe.pdf{width:100%;height:78vh;border:0;border-radius:0 0 18px 18px;backgroun
 .ac{position:relative}.ac .suggest div{font-size:13px}
 .ebtn{border:1px solid var(--line);background:var(--panel2);border-radius:7px;cursor:pointer;padding:2px 7px;margin-right:6px;font-size:12px}
 .ebtn:hover{border-color:var(--brand)}
-@media(max-width:1100px){.grid{grid-template-columns:1fr}header{flex-wrap:wrap}}
+/* Display tokens shared by the dashboard, dialogs and charts. */
+:root{color-scheme:dark;--header:rgba(12,18,34,.92);--hover:#ffffff0d;--track:#ffffff10;--body-glow:#13325044;--soft-text:#cdd5e5;--chip-bg:#14b8a61a;--chip-line:#14b8a655;--chip-text:#5eead4;--expired-text:#fca5a5;--soon-text:#fcd34d;--current-text:#86efac;--overlay:#000a;--loader-bg:#0c1222cc;--chart-none:#475569;--splash-text:#e7ecf5}
+:root[data-theme=light]{color-scheme:light;--bg:#f3f6f9;--panel:#ffffff;--panel2:#eaf0f5;--line:#cbd5e1;--text:#172534;--muted:#526477;--header:rgba(255,255,255,.95);--hover:#17253409;--track:#17253412;--body-glow:#0ea5e912;--soft-text:#34485e;--chip-bg:#0d948815;--chip-line:#0d94884d;--chip-text:#0f766e;--expired-text:#b91c1c;--soon-text:#92400e;--current-text:#166534;--shadow:0 10px 30px -12px rgba(23,37,52,.22);--loader-bg:#f3f6f9cc;--chart-none:#94a3b8}
+body{background:radial-gradient(1200px 600px at 10% -10%,var(--body-glow),transparent),var(--bg)}
+header{background:var(--header)}
+.logo,.kpi .v,#splash h1{letter-spacing:0}
+.insights li{color:var(--soft-text)}
+.chip{background:var(--chip-bg);border-color:var(--chip-line);color:var(--chip-text);max-width:100%;overflow-wrap:anywhere}
+.st-vencida{color:var(--expired-text)}.st-proxima{color:var(--soon-text)}.st-emdia{color:var(--current-text)}.st-sem{background:var(--track)}
+.bar{background:var(--track)}
+.suggest div:hover,.suggest div.act,.ms .opts label:hover,tr:hover td{background:var(--hover)}
+.loader{background:var(--loader-bg)}.spin{border-color:var(--track);border-top-color:var(--brand)}
+.modal{background:var(--overlay)}
+.theme-toggle{width:44px;height:44px;flex:none;justify-content:center;padding:0}
+.theme-toggle svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.theme-toggle .sun{display:none}:root[data-theme=dark] .theme-toggle .sun{display:block}:root[data-theme=dark] .theme-toggle .moon{display:none}
+#splash{color:var(--splash-text)}#splash .theme-toggle{position:absolute;right:24px;top:24px;z-index:2;background:var(--panel);color:var(--text)}
+#splash h1{font-size:70px}#splash .cap{color:var(--splash-text)}
+main,header>* ,.grid>* ,.filters>* ,.field,.tree,.eq,.modal .box{min-width:0}
+.chart-area{height:270px;position:relative;min-width:0}.chart-area canvas{max-width:100%}
+.agenda-grid{grid-template-columns:2fr 1fr}
+.suggest{z-index:35}.suggest div>span,.suggest small{min-width:0;overflow-wrap:anywhere}
+.tablewrap{max-width:100%;overscroll-behavior-x:contain}
+button,input,select,textarea{touch-action:manipulation}button:focus-visible,input:focus-visible{outline:2px solid var(--brand);outline-offset:3px}
+.modal .hd{display:grid;grid-template-columns:minmax(0,1fr) auto}.modal .hd h3{min-width:0;margin:0;overflow-wrap:anywhere}.modal .hd .spacer{display:none}
+#mForm .hd{grid-template-columns:minmax(0,1fr) minmax(230px,1fr) auto}#mPdf .hd{grid-template-columns:minmax(0,1fr) auto auto}
+.modal .hd .transfer-search{min-width:0}.modal .ft{flex-wrap:wrap}
+.toast{max-width:calc(100vw - 40px);overflow-wrap:anywhere;max-height:40dvh;overflow:auto}
+@media(max-width:1200px){header{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:12px}header>.logo{grid-column:1/3}header>.search{grid-column:1/-1;grid-row:2;max-width:none;min-width:0}header>.spacer{display:none}header>.btn:not(.theme-toggle){justify-content:center}.grid,.agenda-grid{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){
+ header{position:relative;padding:12px 14px;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+ header>.logo{grid-column:1/3;font-size:16px;overflow-wrap:anywhere}header>.logo i{flex:none}
+ header>.theme-toggle{grid-column:3;grid-row:1;justify-self:end}
+ header>#mode{grid-column:1/-1;grid-row:2;justify-self:start;white-space:normal}
+ header>.search{grid-row:3}.search input{font-size:16px}
+ header>.btn:not(.theme-toggle){padding:9px 7px;font-size:12px;min-height:44px;white-space:normal;text-align:center}
+ main{padding:16px 14px 36px}.filters{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:0}
+ .filters>div:first-child{grid-column:1/-1}.filters input,.filters .ms>button{min-height:44px;font-size:16px;max-width:100%}
+ .ms .pop{min-width:0;width:max(100%,260px);max-width:calc(100vw - 28px)}.filters>div:nth-child(odd):not(:first-child) .pop{left:auto;right:0}
+ .ms .opts label{min-height:44px}.filters input[type=checkbox]{width:20px;height:20px;min-width:20px;min-height:20px}.ms .opts{max-height:32dvh}
+ .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.kpi{padding:14px 12px}.kpi .v{font-size:28px}.kpi .l{font-size:10px}.kpi .s{font-size:11px;overflow-wrap:anywhere}
+ .grid{gap:12px}.card{padding:14px}.chart-area{height:260px}
+ .section-title{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-top:24px}.section-title h2{font-size:16px;overflow-wrap:anywhere}.section-title .spacer{display:none}.section-title>.btn{grid-column:2}
+ .tree summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:12px 10px}.tree summary>b{grid-column:1/-1;overflow-wrap:anywhere}.tree summary .spacer{display:none}.tree summary .badge{white-space:normal;overflow-wrap:anywhere}.tree summary .mono{grid-column:1/-1}.tree .unit{margin:0 6px 10px}.tree .unit summary{grid-template-columns:minmax(0,1fr) auto}.tree .unit summary>b{grid-column:1/-1}.tree .unit summary>.btn{grid-column:1/-1;justify-self:start;min-height:44px}
+ .tree .eqs{grid-template-columns:minmax(0,1fr);padding:0 8px 10px}.eq{overflow-wrap:anywhere}.eq>div{display:grid!important;grid-template-columns:minmax(0,1fr) auto}.eq b{min-width:0}
+ .tablewrap{border-radius:10px}td,th{padding:12px}.tablewrap .btn,.ebtn{min-height:44px;min-width:44px}
+ .modal{padding:12px 8px;padding-bottom:max(12px,env(safe-area-inset-bottom))}.modal .box{border-radius:12px}.modal .hd{padding:14px 12px;gap:10px}.modal .bd{padding:14px 12px;grid-template-columns:repeat(2,minmax(0,1fr))}.modal .ft{padding:12px;gap:8px}.modal .ft .btn{min-height:44px}.modal .hd>.btn{min-width:44px;min-height:44px;justify-content:center}
+ #mForm .hd{grid-template-columns:minmax(0,1fr) auto}#fTransferSearch{grid-column:1/-1;grid-row:2}#mForm .hd>.btn{grid-column:2;grid-row:1}.field input,.field textarea{font-size:16px;min-height:44px;max-width:100%}.field label{overflow-wrap:anywhere}.suggest div{display:grid;gap:4px;min-height:44px}.suggest small{font-size:11px}.transfer-search .suggest{max-height:35dvh}
+ #splash .ct{padding:80px 22px 110px}#splash h1{font-size:38px}#splash p{font-size:16px}#splash .cap{bottom:26px;left:22px;right:22px;font-size:12px}#splash .dots{bottom:60px;left:22px}
+ .toast{right:12px;bottom:12px;max-width:calc(100vw - 24px);font-size:13px}
+}
+@media(max-width:380px){.modal .bd{grid-template-columns:minmax(0,1fr)}.modal .ft .spacer{display:none}.modal .ft{justify-content:space-between}#splash h1{font-size:32px}}
+@media(max-height:560px){#splash .ct{padding:64px 22px 80px;max-width:800px}#splash h1{font-size:32px;margin:8px 0}#splash p{font-size:14px;margin-bottom:12px}#splash .cap{display:none}#splash .dots{bottom:16px}.modal{padding-top:8px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}.btn:hover{transform:none}}
 </style>
 </head>
 <body>
@@ -144,6 +200,7 @@ iframe.pdf{width:100%;height:78vh;border:0;border-radius:0 0 18px 18px;backgroun
     <div id="suggest" class="suggest"></div>
   </div>
   <div class="spacer"></div>
+  <button class="btn theme-toggle" type="button" onclick="toggleTheme()" aria-label="Alternar modo claro e escuro" title="Alternar modo claro e escuro"><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.5A9 9 0 0 1 9.5 3.5a9 9 0 1 0 11 11Z"/></svg></button>
   <button class="btn" onclick="reload()">↻ Atualizar</button>
   <button class="btn" onclick="openPdf()">⎙ Relatório PDF</button>
   <button class="btn primary" onclick="openForm()">＋ Novo equipamento</button>
@@ -157,12 +214,12 @@ iframe.pdf{width:100%;height:78vh;border:0;border-radius:0 0 18px 18px;backgroun
 
   <section class="grid">
     <div class="card"><h3>Insights automáticos <small>· cenário filtrado</small></h3><ul class="insights" id="insights"></ul></div>
-    <div class="card"><h3>Status das preventivas</h3><canvas id="chStatus" height="210"></canvas></div>
-    <div class="card"><h3>Equipamentos por categoria</h3><canvas id="chCat" height="210"></canvas></div>
+    <div class="card"><h3>Status das preventivas</h3><div class="chart-area"><canvas id="chStatus" height="210"></canvas></div></div>
+    <div class="card"><h3>Equipamentos por categoria</h3><div class="chart-area"><canvas id="chCat" height="210"></canvas></div></div>
   </section>
-  <section class="grid" style="grid-template-columns:2fr 1fr">
-    <div class="card"><h3>Agenda de preventivas <small>· próximos 12 meses</small></h3><canvas id="chAgenda" height="110"></canvas></div>
-    <div class="card"><h3>Carga por responsável</h3><canvas id="chResp" height="220"></canvas></div>
+  <section class="grid agenda-grid">
+    <div class="card"><h3>Agenda de preventivas <small>· próximos 12 meses</small></h3><div class="chart-area"><canvas id="chAgenda" height="110"></canvas></div></div>
+    <div class="card"><h3>Carga por responsável</h3><div class="chart-area"><canvas id="chResp" height="220"></canvas></div></div>
   </section>
 
   <div class="section-title"><h2>Clientes › Unidades › Equipamentos</h2><span class="badge" id="treeCount"></span></div>
@@ -383,18 +440,22 @@ function insightsList(d){
   return L;
 }
 function renderInsights(d){ $('#insights').innerHTML = insightsList(d).map(x=>`<li>${x}</li>`).join(''); }
-Chart.defaults.color='#8b97b1'; Chart.defaults.borderColor='#24304d'; Chart.defaults.font.family='Manrope';
-function chart(id,cfgc){ charts[id]?.destroy(); charts[id]=new Chart(document.getElementById(id),cfgc); }
+const themeColor = name => getComputedStyle(document.documentElement).getPropertyValue('--'+name).trim();
+function syncChartTheme(){if(!window.Chart)return;Chart.defaults.color=themeColor('muted');Chart.defaults.borderColor=themeColor('line');Chart.defaults.font.family='Manrope';Chart.defaults.plugins.tooltip.backgroundColor=themeColor('panel2');Chart.defaults.plugins.tooltip.titleColor=themeColor('text');Chart.defaults.plugins.tooltip.bodyColor=themeColor('text');}
+function updateThemeButtons(){document.querySelectorAll('.theme-toggle').forEach(b=>{const label=document.documentElement.dataset.theme==='dark'?'Ativar modo claro':'Ativar modo escuro';b.title=label;b.setAttribute('aria-label',label);});}
+function toggleTheme(){const theme=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=theme;try{localStorage.setItem('pat_theme',theme)}catch{}syncChartTheme();updateThemeButtons();renderCharts(filtered());}
+const splashTheme=document.querySelector('header .theme-toggle').cloneNode(true);document.getElementById('splash').appendChild(splashTheme);updateThemeButtons();syncChartTheme();
+function chart(id,cfgc){if(!window.Chart)return;charts[id]?.destroy();cfgc.options={...cfgc.options,responsive:true,maintainAspectRatio:false};charts[id]=new Chart(document.getElementById(id),cfgc); }
 function renderCharts(d){
   const c={vencida:0,proxima:0,emdia:0,sem:0}; d.forEach(r=>c[status(r)]++);
-  chart('chStatus',{type:'doughnut',data:{labels:Object.values(ST),datasets:[{data:Object.values(c),backgroundColor:['#ef4444','#f59e0b','#22c55e','#475569'],borderWidth:0}]},options:{cutout:'68%',plugins:{legend:{position:'bottom'}}}});
+  chart('chStatus',{type:'doughnut',data:{labels:Object.values(ST),datasets:[{data:Object.values(c),backgroundColor:['bad','warn','ok','chart-none'].map(themeColor),borderWidth:0}]},options:{cutout:'68%',plugins:{legend:{position:'bottom'}}}});
   const cat={}; d.forEach(r=>cat[r.CATEGORIA]=(cat[r.CATEGORIA]||0)+1); const ce=Object.entries(cat).sort((a,b)=>b[1]-a[1]);
-  chart('chCat',{type:'bar',data:{labels:ce.map(x=>x[0]),datasets:[{data:ce.map(x=>x[1]),backgroundColor:'#14b8a6',borderRadius:6}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{precision:0}}},onClick:(e,el)=>{ if(el[0]){state.f.CATEGORIA=[String(ce[el[0].index][0])];buildFilters();render();} }}});
+  chart('chCat',{type:'bar',data:{labels:ce.map(x=>x[0]),datasets:[{data:ce.map(x=>x[1]),backgroundColor:themeColor('brand'),borderRadius:6}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{precision:0}}},onClick:(e,el)=>{ if(el[0]){state.f.CATEGORIA=[String(ce[el[0].index][0])];buildFilters();render();} }}});
   const months=[...Array(12)].map((_,i)=>new Date(today.getFullYear(),today.getMonth()+i,1));
   const cnt=months.map(m=>d.filter(r=>{const x=pd(r['PROX.']);return x&&x.getFullYear()===m.getFullYear()&&x.getMonth()===m.getMonth();}).length);
-  chart('chAgenda',{type:'bar',data:{labels:months.map(m=>m.toLocaleDateString('pt-BR',{month:'short',year:'2-digit'})),datasets:[{data:cnt,backgroundColor:cnt.map((_,i)=>i===0?'#f59e0b':'#0ea5e9'),borderRadius:6}]},options:{plugins:{legend:{display:false}},scales:{y:{ticks:{precision:0}}}}});
+  chart('chAgenda',{type:'bar',data:{labels:months.map(m=>m.toLocaleDateString('pt-BR',{month:'short',year:'2-digit'})),datasets:[{data:cnt,backgroundColor:cnt.map((_,i)=>themeColor(i===0?'warn':'brand2')),borderRadius:6}]},options:{plugins:{legend:{display:false}},scales:{y:{ticks:{precision:0}}}}});
   const rs={}; d.forEach(r=>{const k=r['RESPONSAVÉL']||'—'; rs[k]=(rs[k]||0)+1;});
-  chart('chResp',{type:'polarArea',data:{labels:Object.keys(rs),datasets:[{data:Object.values(rs),backgroundColor:['#14b8a6aa','#0ea5e9aa','#6366f1aa','#f59e0baa','#22c55eaa','#ef4444aa']}]},options:{plugins:{legend:{position:'bottom'}},scales:{r:{ticks:{display:false}}}}});
+  chart('chResp',{type:'polarArea',data:{labels:Object.keys(rs),datasets:[{data:Object.values(rs),backgroundColor:['brand','brand2','info','warn','ok','bad'].map(k=>themeColor(k)+'aa')}]},options:{plugins:{legend:{position:'bottom'}},scales:{r:{ticks:{display:false}}}}});
 }
 function group(d){ const g={}; d.forEach(r=>{ (g[r.CLIENTE||'—']??={cnpj:new Set(),u:{}}); g[r.CLIENTE||'—'].cnpj.add(r.CNPJ); (g[r.CLIENTE||'—'].u[r.UNIDADE||'—']??=[]).push(r); }); return g; }
 function stSummary(list){ const c={vencida:0,proxima:0}; list.forEach(r=>{const s=status(r); if(c[s]!=null)c[s]++;}); return (c.vencida?`<span class="pill st-vencida">${c.vencida} vencida(s)</span>`:'')+(c.proxima?`<span class="pill st-proxima">${c.proxima} em 30d</span>`:'')+(!c.vencida&&!c.proxima?'<span class="pill st-emdia">OK</span>':''); }
