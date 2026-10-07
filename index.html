@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Patrimônio · Gestão de Equipamentos</title>
+<meta name="description" content="Dashboard e CRUD de patrimônio de equipamentos laboratoriais integrado ao Google Sheets." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root{
+  --bg:#0c1222;--panel:#121a2e;--panel2:#18223b;--line:#24304d;--text:#e7ecf5;--muted:#8b97b1;
+  --brand:#14b8a6;--brand2:#0ea5e9;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444;--info:#6366f1;
+  --r:14px;--shadow:0 10px 30px -12px rgba(0,0,0,.55);
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Manrope,system-ui,sans-serif;background:radial-gradient(1200px 600px at 10% -10%,#13325044,transparent),var(--bg);color:var(--text);min-height:100vh}
+button,input,select,textarea{font:inherit;color:inherit}
+.mono{font-family:'JetBrains Mono',monospace;font-size:.85em}
+header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:16px;padding:14px 28px;background:rgba(12,18,34,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:-.02em;font-size:18px}
+.logo i{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--brand),var(--brand2));display:grid;place-items:center;font-style:normal;color:#04131a}
+.badge{font-size:11px;padding:4px 9px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
+.badge.live{color:var(--ok);border-color:#22c55e55}
+.badge.demo{color:var(--warn);border-color:#f59e0b55}
+.spacer{flex:1}
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel2);padding:9px 14px;border-radius:10px;cursor:pointer;font-weight:600;font-size:14px;transition:.15s}
+.btn:hover{border-color:var(--brand);transform:translateY(-1px)}
+.btn.primary{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#04131a;border:0}
+.btn.danger{color:var(--bad)}
+.btn.sm{padding:6px 9px;font-size:12px}
+main{padding:24px 28px 60px;max-width:1500px;margin:0 auto}
+.search{position:relative;flex:1;min-width:320px;max-width:560px}
+.search input{width:100%;padding:11px 14px 11px 40px;border-radius:12px;border:1px solid var(--line);background:var(--panel);outline:none}
+.search input:focus{border-color:var(--brand)}
+.search span{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted)}
+.suggest{position:absolute;left:0;right:0;top:110%;background:var(--panel2);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);display:none;max-height:320px;overflow:auto}
+.suggest div{padding:9px 14px;cursor:pointer;display:flex;justify-content:space-between;gap:10px;font-size:14px}
+.suggest div:hover,.suggest div.act{background:#ffffff0d}
+.suggest small{color:var(--muted)}
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:18px 0}
+.filters select,.filters input{width:100%;padding:9px 11px;border-radius:10px;border:1px solid var(--line);background:var(--panel)}
+.filters label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);display:block;margin-bottom:5px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.chip{font-size:12px;background:#14b8a61a;border:1px solid #14b8a655;color:#5eead4;padding:4px 10px;border-radius:99px;cursor:pointer}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
+.kpi{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;position:relative;overflow:hidden;cursor:pointer;transition:.15s}
+.kpi:hover{border-color:var(--brand)}
+.kpi::after{content:"";position:absolute;inset:auto -30px -30px auto;width:90px;height:90px;border-radius:50%;background:var(--c,var(--brand));opacity:.12}
+.kpi .l{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.kpi .v{font-size:32px;font-weight:800;letter-spacing:-.03em;margin-top:6px}
+.kpi .s{font-size:12px;color:var(--muted);margin-top:4px}
+.bar{height:5px;background:#ffffff10;border-radius:99px;margin-top:10px;overflow:hidden}.bar b{display:block;height:100%;background:var(--c,var(--brand))}
+.grid{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:14px;margin-top:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px}
+.card h3{margin:0 0 12px;font-size:14px;letter-spacing:.02em}
+.card h3 small{color:var(--muted);font-weight:500}
+.insights li{margin:0 0 9px;font-size:13.5px;line-height:1.45;color:#cdd5e5}
+.insights{padding-left:18px;margin:0}
+.tree details{border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:var(--panel2)}
+.tree summary{padding:12px 14px;cursor:pointer;display:flex;gap:10px;align-items:center;list-style:none}
+.tree summary::-webkit-details-marker{display:none}
+.tree .unit{margin:0 12px 10px;background:var(--panel)}
+.tree .eqs{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px;padding:0 12px 12px}
+.eq{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px;cursor:pointer}
+.eq:hover{border-color:var(--brand)}
+.eq b{display:block}
+.pill{font-size:11px;padding:3px 8px;border-radius:99px;font-weight:700;white-space:nowrap}
+.st-vencida{background:#ef444422;color:#fca5a5}.st-proxima{background:#f59e0b22;color:#fcd34d}.st-emdia{background:#22c55e22;color:#86efac}.st-sem{background:#ffffff12;color:var(--muted)}
+.tablewrap{overflow:auto;border-radius:var(--r);border:1px solid var(--line);margin-top:14px}
+table{border-collapse:collapse;width:100%;font-size:13px;background:var(--panel)}
+th{position:sticky;top:0;background:var(--panel2);text-align:left;padding:11px 12px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);cursor:pointer;white-space:nowrap}
+td{padding:10px 12px;border-top:1px solid var(--line);white-space:nowrap}
+tr:hover td{background:#ffffff06}
+.section-title{display:flex;align-items:center;gap:10px;margin:28px 0 4px}
+.section-title h2{margin:0;font-size:18px}
+.modal{position:fixed;inset:0;background:#000a;display:none;align-items:flex-start;justify-content:center;z-index:50;padding:40px 16px;overflow:auto}
+.modal.open{display:flex}
+.modal .box{background:var(--panel);border:1px solid var(--line);border-radius:18px;width:min(900px,100%);box-shadow:var(--shadow)}
+.modal .hd{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center}
+.modal .bd{padding:20px 22px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.modal .ft{padding:14px 22px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px}
+.field label{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:block;margin-bottom:5px}
+.field input,.field textarea{width:100%;padding:9px 11px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);outline:none}
+.field input:focus{border-color:var(--brand)}
+.toast{position:fixed;right:20px;bottom:20px;background:var(--panel2);border:1px solid var(--line);padding:12px 16px;border-radius:12px;box-shadow:var(--shadow);transform:translateY(120%);transition:.25s;z-index:60}
+.toast.show{transform:none}
+.loader{position:fixed;inset:0;background:#0c1222cc;display:none;place-items:center;z-index:70}
+.loader.on{display:grid}
+.spin{width:42px;height:42px;border:4px solid #ffffff22;border-top-color:var(--brand);border-radius:50%;animation:s 1s linear infinite}
+@keyframes s{to{transform:rotate(360deg)}}
+iframe.pdf{width:100%;height:78vh;border:0;border-radius:0 0 18px 18px;background:#fff}
+@media(max-width:1100px){.grid{grid-template-columns:1fr}header{flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><i>◆</i>Patrimônio</div>
+  <span id="mode" class="badge demo">Modo demonstração</span>
+  <div class="search">
+    <span>⌕</span>
+    <input id="q" autocomplete="off" placeholder="Busca inteligente: equipamento, serial, cliente… ou  responsavel:felipe  status:vencida" />
+    <div id="suggest" class="suggest"></div>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn" onclick="reload()">↻ Atualizar</button>
+  <button class="btn" onclick="openPdf()">⎙ Relatório PDF</button>
+  <button class="btn primary" onclick="openForm()">＋ Novo equipamento</button>
+</header>
+
+<main>
+  <div class="filters" id="filters"></div>
+  <div class="chips" id="chips"></div>
+
+  <section class="kpis" id="kpis"></section>
+
+  <section class="grid">
+    <div class="card"><h3>Insights automáticos <small>· cenário filtrado</small></h3><ul class="insights" id="insights"></ul></div>
+    <div class="card"><h3>Status das preventivas</h3><canvas id="chStatus" height="210"></canvas></div>
+    <div class="card"><h3>Equipamentos por categoria</h3><canvas id="chCat" height="210"></canvas></div>
+  </section>
+  <section class="grid" style="grid-template-columns:2fr 1fr">
+    <div class="card"><h3>Agenda de preventivas <small>· próximos 12 meses</small></h3><canvas id="chAgenda" height="110"></canvas></div>
+    <div class="card"><h3>Carga por responsável</h3><canvas id="chResp" height="220"></canvas></div>
+  </section>
+
+  <div class="section-title"><h2>Clientes › Unidades › Equipamentos</h2><span class="badge" id="treeCount"></span></div>
+  <div class="tree" id="tree"></div>
+
+  <div class="section-title"><h2>Registros</h2><span class="badge" id="rowCount"></span><div class="spacer"></div><button class="btn sm" onclick="exportXlsx()">⤓ Excel</button></div>
+  <div class="tablewrap"><table id="table"></table></div>
+</main>
+
+<!-- Formulário -->
+<div class="modal" id="mForm"><div class="box">
+  <div class="hd"><h3 id="fTitle" style="margin:0">Equipamento</h3><div class="spacer"></div><button class="btn sm" onclick="closeM('mForm')">✕</button></div>
+  <form id="form" onsubmit="saveForm(event)"><div class="bd" id="fBody"></div>
+  <div class="ft"><button type="button" class="btn danger" id="fDel" onclick="delCurrent()">Excluir</button><div class="spacer"></div><button type="button" class="btn" onclick="closeM('mForm')">Cancelar</button><button class="btn primary">Salvar</button></div></form>
+</div></div>
+
+<!-- PDF -->
+<div class="modal" id="mPdf"><div class="box" style="width:min(1100px,100%)">
+  <div class="hd"><h3 style="margin:0">Relatório do cenário filtrado</h3><div class="spacer"></div><button class="btn sm" onclick="downloadPdf()">⤓ Baixar</button>&nbsp;<button class="btn sm" onclick="closeM('mPdf')">✕</button></div>
+  <iframe class="pdf" id="pdfFrame"></iframe>
+</div></div>
+
+<div class="loader" id="loader"><div class="spin"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ======================= CONFIG ======================= */
+/* A URL do Apps Script e o API_TOKEN ficam SOMENTE nas variáveis de ambiente da Vercel.
+   O navegador conversa apenas com a função /api/patrimonio (proxy no servidor). */
+const API = '/api/patrimonio';
+let LIVE = false;
+const SEED = [{"ID": "demo-0", "REGIÃO": "ZONA NORTE", "CATEGORIA": "URINÁLISE", "INSTALAÇÃO": "2025-11-05", "UNIDADE": "HOSPITAL SÃO MATHEUS", "EQUIPAMENTO": "URIVIDA 500", "SERIAL": "2431344H", "CD PAT": 764, "SETOR": "", "TEC": "", "CLIENTE": "AMA ASSISTENCIA MEDICA ALTERNATIVA LTDA", "PREV. ATUAL": "2025-11-05", "PROX.": "2026-05-04", "RESPONSAVÉL": "", "TROCA DE LÂMP": "", "TROCA DE PROB": "", "TROCA REFER": "", "TROCA DA LS": "", "OBS": "", "LOCAÇÃO R$": "", "CNPJ": "00.937.991/0002-14"}, {"ID": "demo-1", "REGIÃO": "ZONA NORTE", "CATEGORIA": "IMUNOLOGIA", "INSTALAÇÃO": "", "UNIDADE": "HOSPITAL SÃO MATHEUS", "EQUIPAMENTO": "APOTI PLUS", "SERIAL": "82400346", "CD PAT": 1493, "SETOR": "", "TEC": "", "CLIENTE": "AMA ASSISTENCIA MEDICA ALTERNATIVA LTDA", "PREV. ATUAL": "2026-03-31", "PROX.": "2027-03-26", "RESPONSAVÉL": "ROGERIO", "TROCA DE LÂMP": "", "TROCA DE PROB": "", "TROCA REFER": "", "TROCA DA LS": "", "OBS": "", "LOCAÇÃO R$": "?", "CNPJ": "00.937.991/0002-14"}, {"ID": "demo-2", "REGIÃO": "ZONA NORTE", "CATEGORIA": "ELETRÓLITOS", "INSTALAÇÃO": "", "UNIDADE": "HOSPITAL SÃO MATHEUS", "EQUIPAMENTO": "ELECTROLYTE V", "SERIAL": 2205140, "CD PAT": 491, "SETOR": "", "TEC": "", "CLIENTE": "AMA ASSISTENCIA MEDICA ALTERNATIVA LTDA", "PREV. ATUAL": "2026-03-31", "PROX.": "2026-09-27", "RESPONSAVÉL": "FELIPE", "TROCA DE LÂMP": "", "TROCA DE PROB": "", "TROCA REFER": "", "TROCA DA LS": "", "OBS": "", "LOCAÇÃO R$": "", "CNPJ": "00.937.991/0002-14"}, {"ID": "demo-3", "REGIÃO": "ZONA NORTE", "CATEGORIA": "GASOMETRIA", "INSTALAÇÃO": "", "UNIDADE": "HOSPITAL SÃO MATHEUS", "EQUIPAMENTO": "PRIME", "SERIAL": "CEL550", "CD PAT": 417, "SETOR": "", "TEC": "", "CLIENTE": "AMA ASSISTENCIA MEDICA ALTERNATIVA LTDA", "PREV. ATUAL": "2026-03-31", "PROX.": "2026-09-27", "RESPONSAVÉL": "FELIPE", "TROCA DE LÂMP": "", "TROCA DE PROB": "", "TROCA REFER": "", "TROCA DA LS": "", "OBS": "", "LOCAÇÃO R$": "", "CNPJ": "00.937.991/0002-14"}, {"ID": "demo-4", "REGIÃO": "ZONA NORTE", "CATEGORIA": "BIOQUÍMICA", "INSTALAÇÃO": "2026-03-31", "UNIDADE": "HOSPITAL SÃO MATHEUS", "EQUIPAMENTO": "VIDA S1600", "SERIAL": "AES2K2KT11230", "CD PAT": 43, "SETOR": "", "TEC": "", "CLIENTE": "AMA ASSISTENCIA MEDICA ALTERNATIVA LTDA", "PREV. ATUAL": "2026-03-31", "PROX.": "2027-03-26", "RESPONSAVÉL": "FELIPE", "TROCA DE LÂMP": 45447, "TROCA DE PROB": "", "TROCA REFER": "", "TROCA DA LS": "", "OBS": "", "LOCAÇÃO R$": "", "CNPJ": "00.937.991/0002-14"}, {"ID": "demo-5", "REGIÃO": "ZONA NORTE", "CATEGORIA": "COAGULAÇÃO", "INSTALAÇÃO": "2024-10-02", "UNIDADE": "HOSPITAL SÃO MATHEUS", "EQUIPAMENTO": "CA 540", "SERIAL": 2944, "CD PAT": 1099, "SETOR": "", "TEC": "", "CLIENTE": "AMA ASSISTENCIA MEDICA ALTERNATIVA LTDA", "PREV. ATUAL": "2026-04-01", "PROX.": "2027-03-27", "RESPONSAVÉL": "FELIPE", "TROCA DE LÂMP": "", "TROCA DE PROB": "", "TROCA REFER": "", "TROCA DA LS": "", "OBS": "", "LOCAÇÃO R$": "", "CNPJ": "00.937.991/0002-14"}, {"ID": "demo-6", "REGIÃO": "ZONA NORTE", "CATEGORIA": "GASOMETRIA", "INSTALAÇÃO": "", "UNIDADE": "HOSPITAL SÃO MATHEUS", "EQUIPAMENTO": "PRIME", "SERIAL": "P37318130", "CD PAT": 1034, "SETOR": "", "TEC": "", "CLIENTE": "AMA ASSISTENCIA MEDICA ALTERNATIVA LTDA", "PREV. ATUAL": "2026-04-01", "PROX.": "2026-09-28", "RESPONSAVÉL": "FELIPE", "TROCA DE LÂMP": "", "TROCA DE PROB": "", "TROCA REFER": "", "TROCA DA LS": "", "OBS": "", "LOCAÇÃO R$": "", "CNPJ": "00.937.991/0002-14"}, {"ID": "demo-7", "REGIÃO": "ZONA NORTE", "CATEGORIA": "HEMATOLOGIA", "INSTALAÇÃO": "2026-07-13", "UNIDADE": "HOSPITAL SÃO MATHEUS", "EQUIPAMENTO": "VIDACOUNT 380", "SERIAL": "EC382208JUN066", "CD PAT": 459, "SETOR": "", "TEC": "", "CLIENTE": "AMA ASSISTENCIA MEDICA ALTERNATIVA LTDA", "PREV. ATUAL": "2026-07-13", "PROX.": "2027-07-08", "RESPONSAVÉL": "JAMIL", "TROCA DE LÂMP": "", "TROCA DE PROB": "", "TROCA REFER": "", "TROCA DA LS": "", "OBS": "", "LOCAÇÃO R$": "", "CNPJ": "00.937.991/0002-14"}, {"ID": "demo-8", "REGIÃO": "ZONA NORTE", "CATEGORIA": "BIOQUÍMICA", "INSTALAÇÃO": "", "UNIDADE": "HOSPITAL SÃO MATHEUS", "EQUIPAMENTO": "BS 200E", "SERIAL": "XR-17004392", "CD PAT": 1096, "SETOR": "", "TEC": "", "CLIENTE": "AMA ASSISTENCIA MEDICA ALTERNATIVA LTDA", "PREV. ATUAL": "", "PROX.": "", "RESPONSAVÉL": "", "TROCA DE LÂMP": "", "TROCA DE PROB": "", "TROCA REFER": "", "TROCA DA LS": "", "OBS": "", "LOCAÇÃO R$": "", "CNPJ": "00.937.991/0002-14"}, {"ID": "demo-9", "REGIÃO": "ZONA NORTE", "CATEGORIA": "AUXILIAR", "INSTALAÇÃO": "2026-03-31", "UNIDADE": "HOSPITAL SÃO MATHEUS", "EQUIPAMENTO": "CPU", "SERIAL": "AES2K2KT11230", "CD PAT": 45, "SETOR": "", "TEC": "", "CLIENTE": "AMA ASSISTENCIA MEDICA ALTERNATIVA LTDA", "PREV. ATUAL": "", "PROX.": "", "RESPONSAVÉL": "", "TROCA DE LÂMP": "", "TROCA DE PROB": "", "TROCA REFER": "", "TROCA DA LS": "", "OBS": "", "LOCAÇÃO R$": "", "CNPJ": "00.937.991/0002-14"}, {"ID": "demo-10", "REGIÃO": "ZONA NORTE", "CATEGORIA": "HEMATOLOGIA", "INSTALAÇÃO": "", "UNIDADE": "HOSPITAL SÃO MATHEUS", "EQUIPAMENTO": "HEMACOUNTER SL", "SERIAL": "862308007IEJP", "CD PAT": 1097, "SETOR": "", "TEC": "", "CLIENTE": "AMA ASSISTENCIA MEDICA ALTERNATIVA LTDA", "PREV. ATUAL": "", "PROX.": "", "RESPONSAVÉL": "", "TROCA DE LÂMP": "", "TROCA DE PROB": "", "TROCA REFER": "", "TROCA DA LS": "", "OBS": "", "LOCAÇÃO R$": "", "CNPJ": "00.937.991/0002-14"}, {"ID": "demo-11", "REGIÃO": "ZONA NORTE", "CATEGORIA": "PERIFÉRICO", "INSTALAÇÃO": "2026-03-31", "UNIDADE": "HOSPITAL SÃO MATHEUS", "EQUIPAMENTO": "MONITOR", "SERIAL": "BR-0V4FTW-TVB00-2C9-004B-A07", "CD PAT": 1122, "SETOR": "", "TEC": "", "CLIENTE": "AMA ASSISTENCIA MEDICA ALTERNATIVA LTDA", "PREV. ATUAL": "", "PROX.": "", "RESPONSAVÉL": "", "TROCA DE LÂMP": "", "TROCA DE PROB": "", "TROCA REFER": "", "TROCA DA LS": "", "OBS": "", "LOCAÇÃO R$": "", "CNPJ": "00.937.991/0002-14"}, {"ID": "demo-12", "REGIÃO": "ZONA NORTE", "CATEGORIA": "AUXILIAR", "INSTALAÇÃO": "2024-10-02", "UNIDADE": "HOSPITAL SÃO MATHEUS", "EQUIPAMENTO": "NOBREAK", "SERIAL": "", "CD PAT": "", "SETOR": "", "TEC": "", "CLIENTE": "AMA ASSISTENCIA MEDICA ALTERNATIVA LTDA", "PREV. ATUAL": "", "PROX.": "", "RESPONSAVÉL": "", "TROCA DE LÂMP": "", "TROCA DE PROB": "", "TROCA REFER": "", "TROCA DA LS": "", "OBS": "", "LOCAÇÃO R$": "", "CNPJ": "00.937.991/0002-14"}, {"ID": "demo-13", "REGIÃO": "ZONA NORTE", "CATEGORIA": "AUXILIAR", "INSTALAÇÃO": "", "UNIDADE": "HOSPITAL SÃO MATHEUS", "EQUIPAMENTO": "NOBREAK 1200VA", "SERIAL": "22105814402006002-7", "CD PAT": "", "SETOR": "", "TEC": "", "CLIENTE": "AMA ASSISTENCIA MEDICA ALTERNATIVA LTDA", "PREV. ATUAL": "", "PROX.": "", "RESPONSAVÉL": "", "TROCA DE LÂMP": "", "TROCA DE PROB": "", "TROCA REFER": "", "TROCA DA LS": "", "OBS": "", "LOCAÇÃO R$": "", "CNPJ": "00.937.991/0002-14"}, {"ID": "demo-14", "REGIÃO": "ZONA NORTE", "CATEGORIA": "AUXILIAR", "INSTALAÇÃO": "2026-03-31", "UNIDADE": "HOSPITAL SÃO MATHEUS", "EQUIPAMENTO": "NOBREAK 1800VA", "SERIAL": "243434539-0258", "CD PAT": 1198, "SETOR": "", "TEC": "", "CLIENTE": "AMA ASSISTENCIA MEDICA ALTERNATIVA LTDA", "PREV. ATUAL": "", "PROX.": "", "RESPONSAVÉL": "", "TROCA DE LÂMP": "", "TROCA DE PROB": "", "TROCA REFER": "", "TROCA DA LS": "", "OBS": "", "LOCAÇÃO R$": "", "CNPJ": "00.937.991/0002-14"}, {"ID": "demo-15", "REGIÃO": "ZONA NORTE", "CATEGORIA": "AUXILIAR", "INSTALAÇÃO": "", "UNIDADE": "HOSPITAL SÃO MATHEUS", "EQUIPAMENTO": "NOBREAK 2200VA", "SERIAL": "201003254-3", "CD PAT": 1098, "SETOR": "", "TEC": "", "CLIENTE": "AMA ASSISTENCIA MEDICA ALTERNATIVA LTDA", "PREV. ATUAL": "", "PROX.": "", "RESPONSAVÉL": "", "TROCA DE LÂMP": "", "TROCA DE PROB": "", "TROCA REFER": "", "TROCA DA LS": "", "OBS": "", "LOCAÇÃO R$": "", "CNPJ": "00.937.991/0002-14"}, {"ID": "demo-16", "REGIÃO": "ZONA NORTE", "CATEGORIA": "AUXILIAR", "INSTALAÇÃO": "", "UNIDADE": "HOSPITAL SÃO MATHEUS", "EQUIPAMENTO": "NOBREAK 3200VA", "SERIAL": "22082984450005001-3", "CD PAT": 1046, "SETOR": "", "TEC": "", "CLIENTE": "AMA ASSISTENCIA MEDICA ALTERNATIVA LTDA", "PREV. ATUAL": "", "PROX.": "", "RESPONSAVÉL": "", "TROCA DE LÂMP": "", "TROCA DE PROB": "", "TROCA REFER": "", "TROCA DA LS": "", "OBS": "", "LOCAÇÃO R$": "", "CNPJ": "00.937.991/0002-14"}, {"ID": "demo-17", "REGIÃO": "ZONA NORTE", "CATEGORIA": "AUXILIAR", "INSTALAÇÃO": "", "UNIDADE": "HOSPITAL SÃO MATHEUS", "EQUIPAMENTO": "NOBREAK 600VA", "SERIAL": "231744004-0559", "CD PAT": 358, "SETOR": "", "TEC": "", "CLIENTE": "AMA ASSISTENCIA MEDICA ALTERNATIVA LTDA", "PREV. ATUAL": "", "PROX.": "", "RESPONSAVÉL": "", "TROCA DE LÂMP": "", "TROCA DE PROB": "", "TROCA REFER": "", "TROCA DA LS": "", "OBS": "", "LOCAÇÃO R$": "", "CNPJ": "03.771.874/0001-30"}, {"ID": "demo-18", "REGIÃO": "ZONA NORTE", "CATEGORIA": "AUXILIAR", "INSTALAÇÃO": "", "UNIDADE": "HOSPITAL SÃO MATHEUS", "EQUIPAMENTO": "NOBREAK 600VA", "SERIAL": "231744004-0560", "CD PAT": 360, "SETOR": "", "TEC": "", "CLIENTE": "AMA ASSISTENCIA MEDICA ALTERNATIVA LTDA", "PREV. ATUAL": "", "PROX.": "", "RESPONSAVÉL": "", "TROCA DE LÂMP": "", "TROCA DE PROB": "", "TROCA REFER": "", "TROCA DA LS": "", "OBS": "", "LOCAÇÃO R$": "", "CNPJ": "03.771.874/0001-30"}, {"ID": "demo-19", "REGIÃO": "ZONA NORTE", "CATEGORIA": "AUXILIAR", "INSTALAÇÃO": "", "UNIDADE": "HOSPITAL SÃO MATHEUS", "EQUIPAMENTO": "NOBREAK 600VA", "SERIAL": " 214553240030030000", "CD PAT": 19, "SETOR": "", "TEC": "", "CLIENTE": "AMA ASSISTENCIA MEDICA ALTERNATIVA LTDA", "PREV. ATUAL": "", "PROX.": "", "RESPONSAVÉL": "", "TROCA DE LÂMP": "", "TROCA DE PROB": "", "TROCA REFER": "", "TROCA DA LS": "", "OBS": "", "LOCAÇÃO R$": "", "CNPJ": "03.771.874/0001-30"}, {"ID": "demo-20", "REGIÃO": "ZONA NORTE", "CATEGORIA": "IMUNOLOGIA", "INSTALAÇÃO": "", "UNIDADE": "HOSPITAL SÃO MATHEUS", "EQUIPAMENTO": "VIDA FIA PRO", "SERIAL": "70F06C6101000025", "CD PAT": 18, "SETOR": "", "TEC": "", "CLIENTE": "AMA ASSISTENCIA MEDICA ALTERNATIVA LTDA", "PREV. ATUAL": "", "PROX.": "", "RESPONSAVÉL": "", "TROCA DE LÂMP": "", "TROCA DE PROB": "", "TROCA REFER": "", "TROCA DA LS": "", "OBS": "", "LOCAÇÃO R$": "?", "CNPJ": "03.771.874/0001-30"}, {"ID": "demo-21", "REGIÃO": "ZONA NORTE", "CATEGORIA": "BIOQUÍMICA", "INSTALAÇÃO": "2026-09-18", "UNIDADE": "HOSPITAL SÃO MATHEUS", "EQUIPAMENTO": "BM 200", "SERIAL": "XR 18004426", "CD PAT": 1028, "SETOR": "", "TEC": "", "CLIENTE": "AMA ASSISTENCIA MEDICA ALTERNATIVA LTDA", "PREV. ATUAL": "2026-09-18", "PROX.": "2027-09-13", "RESPONSAVÉL": "BRENO", "TROCA DE LÂMP": "", "TROCA DE PROB": "", "TROCA REFER": "", "TROCA DA LS": "", "OBS": "", "LOCAÇÃO R$": "", "CNPJ": "03.771.874/0001-30"}];
+const COLS = ["REGIÃO","CATEGORIA","INSTALAÇÃO","UNIDADE","EQUIPAMENTO","SERIAL","CD PAT","SETOR","TEC","CLIENTE","PREV. ATUAL","PROX.","RESPONSAVÉL","TROCA DE LÂMP","TROCA DE PROB","TROCA REFER","TROCA DA LS","OBS","LOCAÇÃO R$","CNPJ"];
+const DATE_COLS = ["INSTALAÇÃO","PREV. ATUAL","PROX."];
+const TABLE_COLS = ["CLIENTE","UNIDADE","CATEGORIA","EQUIPAMENTO","SERIAL","CD PAT","RESPONSAVÉL","PREV. ATUAL","PROX.","REGIÃO"];
+const ALIAS = {cliente:"CLIENTE",unidade:"UNIDADE",categoria:"CATEGORIA",cat:"CATEGORIA",equipamento:"EQUIPAMENTO",eq:"EQUIPAMENTO",serial:"SERIAL",pat:"CD PAT",patrimonio:"CD PAT",responsavel:"RESPONSAVÉL",resp:"RESPONSAVÉL",regiao:"REGIÃO",cnpj:"CNPJ",status:"_status"};
+const ST = {vencida:"Vencida",proxima:"Vence em 30d",emdia:"Em dia",sem:"Sem data"};
+
+let rows = [], state = {q:'', f:{}, sort:{k:'PROX.',d:1}}, current=null, charts={}, pdfDoc=null;
+const $ = s => document.querySelector(s);
+const norm = s => String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const today = (()=>{const d=new Date();d.setHours(0,0,0,0);return d})();
+const pd = s => { if(!s) return null; const m=String(s).match(/^(\d{4})-(\d{2})-(\d{2})/); return m? new Date(+m[1],m[2]-1,+m[3]) : null; };
+const br = s => { const d=pd(s); return d? d.toLocaleDateString('pt-BR') : '—'; };
+const days = s => { const d=pd(s); return d? Math.round((d-today)/864e5) : null; };
+function status(r){ const n=days(r['PROX.']); if(n===null) return 'sem'; if(n<0) return 'vencida'; if(n<=30) return 'proxima'; return 'emdia'; }
+const pill = st => `<span class="pill st-${st}">${ST[st]}</span>`;
+
+/* ======================= API ======================= */
+async function api(method, payload){
+  if(!LIVE) return demo(method,payload);
+  const r = method==='GET' ? await fetch(API,{cache:'no-store'})
+    : await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const j = await r.json().catch(()=>({ok:false,error:'Resposta inválida ('+r.status+')'}));
+  if(!j.ok) throw new Error(j.error||('HTTP '+r.status));
+  return method==='GET' ? j.data.rows : j.data;
+}
+async function probe(){
+  if(location.protocol==='file:') return false;
+  try{ const r=await fetch(API+'?ping=1',{cache:'no-store'}); const j=await r.json(); return !!(j.ok&&j.configured); }catch{ return false; }
+}
+function demo(method,p){
+  let db = JSON.parse(localStorage.getItem('pat_demo')||'null') || SEED;
+  if(method==='GET') return db;
+  if(p.action==='create'){ p.record.ID='demo-'+Date.now(); db.push(p.record); }
+  if(p.action==='update'){ db = db.map(r=>r.ID===p.record.ID?p.record:r); }
+  if(p.action==='delete'){ db = db.filter(r=>r.ID!==p.id); }
+  localStorage.setItem('pat_demo',JSON.stringify(db)); return p.record||{};
+}
+const busy = on => $('#loader').classList.toggle('on',on);
+function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2800); }
+
+async function reload(){
+  busy(true);
+  try{ LIVE = await probe(); rows = (await api('GET')).map(r=>({...r})); const live=LIVE;
+    $('#mode').className='badge '+(live?'live':'demo'); $('#mode').textContent= live?'● Conectado ao Google Sheets':'Modo demonstração';
+    buildFilters(); render();
+  }catch(e){ toast('Erro ao carregar: '+e.message); }
+  busy(false);
+}
+
+/* ======================= FILTROS & BUSCA ======================= */
+const FILTERS = [["CLIENTE","Cliente"],["UNIDADE","Unidade"],["CATEGORIA","Categoria"],["REGIÃO","Região"],["_status","Status preventiva"]];
+function uniq(k){ return [...new Set(rows.map(r=>k==='_status'?status(r):r[k]).filter(v=>v!==''&&v!=null))].sort(); }
+function buildFilters(){
+  $('#filters').innerHTML = FILTERS.map(([k,l])=>`<div><label>${l}</label><select data-k="${k}"><option value="">Todos</option>${uniq(k).map(v=>`<option value="${esc(v)}" ${state.f[k]==v?'selected':''}>${esc(k==='_status'?ST[v]:v)}</option>`).join('')}</select></div>`).join('')
+   + `<div><label>Próx. preventiva de</label><input type="date" data-k="_de" value="${state.f._de||''}"></div><div><label>até</label><input type="date" data-k="_ate" value="${state.f._ate||''}"></div>`;
+  $('#filters').querySelectorAll('select,input').forEach(el=>el.onchange=()=>{ state.f[el.dataset.k]=el.value; if(el.dataset.k==='CLIENTE'){state.f.UNIDADE='';buildFilters();} render(); });
+}
+function parseQuery(q){
+  const terms=[], fields={};
+  q.replace(/(\w+):("[^"]+"|\S+)|("[^"]+"|\S+)/g,(m,k,v,t)=>{
+    if(k && ALIAS[norm(k)]) fields[ALIAS[norm(k)]]=norm(v.replace(/"/g,'')); else terms.push(norm((t||m).replace(/"/g,'')));
+  });
+  return {terms,fields};
+}
+function filtered(){
+  const {terms,fields}=parseQuery(state.q);
+  return rows.filter(r=>{
+    for(const [k,v] of Object.entries(state.f)){
+      if(!v) continue;
+      if(k==='_de'){ if(!(r['PROX.']>=v)) return false; continue; }
+      if(k==='_ate'){ if(!(r['PROX.'] && r['PROX.']<=v)) return false; continue; }
+      if(k==='_status'){ if(status(r)!==v) return false; continue; }
+      if(String(r[k])!==v) return false;
+    }
+    for(const [k,v] of Object.entries(fields)){
+      const val = k==='_status' ? norm(status(r)+' '+ST[status(r)]) : norm(r[k]);
+      if(!val.includes(v)) return false;
+    }
+    const hay = norm(COLS.map(c=>r[c]).join(' ')+' '+ST[status(r)]);
+    return terms.every(t=>hay.includes(t));
+  });
+}
+function chips(){
+  const c=[];
+  if(state.q) c.push(['q',`Busca: “${state.q}”`]);
+  for(const [k,v] of Object.entries(state.f)) if(v) c.push([k,`${(FILTERS.find(f=>f[0]===k)||[,k==='_de'?'De':'Até'])[1]}: ${k==='_status'?ST[v]:(k[0]==='_'?br(v):v)}`]);
+  $('#chips').innerHTML = c.map(([k,l])=>`<span class="chip" data-k="${k}">${esc(l)} ✕</span>`).join('') + (c.length?`<span class="chip" data-k="*">Limpar tudo</span>`:'');
+  $('#chips').querySelectorAll('.chip').forEach(el=>el.onclick=()=>{ const k=el.dataset.k; if(k==='*'){state.f={};state.q='';} else if(k==='q') state.q=''; else state.f[k]=''; $('#q').value=state.q; buildFilters(); render(); });
+}
+
+/* Sugestões da busca */
+const q=$('#q'), sg=$('#suggest'); let sIdx=-1;
+q.addEventListener('input',()=>{ state.q=q.value; render(); suggest(); });
+q.addEventListener('keydown',e=>{ const it=[...sg.children]; if(!it.length) return;
+  if(e.key==='ArrowDown'){sIdx=Math.min(sIdx+1,it.length-1);} else if(e.key==='ArrowUp'){sIdx=Math.max(sIdx-1,0);} else if(e.key==='Enter'&&sIdx>=0){it[sIdx].click();e.preventDefault();return;} else if(e.key==='Escape'){sg.style.display='none';return;} else return;
+  it.forEach((x,i)=>x.classList.toggle('act',i===sIdx)); e.preventDefault(); });
+q.addEventListener('blur',()=>setTimeout(()=>sg.style.display='none',150));
+function suggest(){
+  const last = norm(q.value.split(/\s+/).pop()); sIdx=-1;
+  if(last.length<2 || last.includes(':')){ sg.style.display='none'; return; }
+  const out=[];
+  [["CLIENTE","cliente"],["UNIDADE","unidade"],["EQUIPAMENTO","equipamento"],["CATEGORIA","categoria"],["RESPONSAVÉL","responsavel"],["SERIAL","serial"]].forEach(([k,a])=>
+    uniq(k).forEach(v=>{ if(norm(v).includes(last)) out.push([a,v]); }));
+  sg.innerHTML = out.slice(0,10).map(([a,v])=>`<div data-v='${a}:"${esc(v)}"'><span>${esc(v)}</span><small>${a}</small></div>`).join('');
+  sg.style.display = out.length?'block':'none';
+  [...sg.children].forEach(d=>d.onclick=()=>{ const parts=q.value.split(/\s+/); parts.pop(); parts.push(d.dataset.v); q.value=parts.join(' ').trim()+' '; state.q=q.value.trim(); sg.style.display='none'; q.focus(); render(); });
+}
+
+/* ======================= RENDER ======================= */
+function render(){
+  const data = filtered(); chips();
+  renderKpis(data); renderInsights(data); renderCharts(data); renderTree(data); renderTable(data);
+}
+function renderKpis(d){
+  const c={vencida:0,proxima:0,emdia:0,sem:0}; d.forEach(r=>c[status(r)]++);
+  const n=d.length||1, conf=Math.round((c.emdia+c.proxima)/n*100);
+  const clientes=new Set(d.map(r=>r.CLIENTE)).size, unid=new Set(d.map(r=>r.CLIENTE+'|'+r.UNIDADE)).size, cats=new Set(d.map(r=>r.CATEGORIA)).size;
+  const K=[
+    ['Equipamentos',d.length,`${cats} categorias`,'var(--brand)',100,null],
+    ['Clientes · Unidades',`${clientes} · ${unid}`,`${(d.length/(unid||1)).toFixed(1)} equip./unidade`,'var(--brand2)',100,null],
+    ['Conformidade',conf+'%','preventivas dentro do prazo',conf>=90?'var(--ok)':conf>=70?'var(--warn)':'var(--bad)',conf,null],
+    ['Vencidas',c.vencida,'ação imediata','var(--bad)',c.vencida/n*100,'vencida'],
+    ['Vencem em 30 dias',c.proxima,'planejar visitas','var(--warn)',c.proxima/n*100,'proxima'],
+    ['Em dia',c.emdia,'próxima > 30 dias','var(--ok)',c.emdia/n*100,'emdia'],
+  ];
+  $('#kpis').innerHTML = K.map(([l,v,s,col,p,st])=>`<div class="kpi" style="--c:${col}" ${st?`data-st="${st}"`:''}><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div><div class="bar"><b style="width:${Math.min(100,p)}%"></b></div></div>`).join('');
+  $('#kpis').querySelectorAll('[data-st]').forEach(el=>el.onclick=()=>{ state.f._status = state.f._status===el.dataset.st?'':el.dataset.st; buildFilters(); render(); });
+}
+function insightsList(d){
+  const L=[]; if(!d.length) return ['Nenhum registro no cenário atual.'];
+  const venc=d.filter(r=>status(r)==='vencida').sort((a,b)=>days(a['PROX.'])-days(b['PROX.']));
+  if(venc.length) L.push(`<b>${venc.length}</b> preventiva(s) vencida(s). Mais crítica: <b>${esc(venc[0].EQUIPAMENTO)}</b> (${esc(venc[0].UNIDADE)}) há ${-days(venc[0]['PROX.'])} dias.`);
+  const next=d.filter(r=>r['PROX.']&&days(r['PROX.'])>=0).sort((a,b)=>days(a['PROX.'])-days(b['PROX.']))[0];
+  if(next) L.push(`Próxima preventiva: <b>${esc(next.EQUIPAMENTO)}</b> em ${br(next['PROX.'])} (${days(next['PROX.'])} dias) — ${esc(next['RESPONSAVÉL']||'sem responsável')}.`);
+  const resp={}; d.forEach(r=>{const k=r['RESPONSAVÉL']||'Sem responsável'; resp[k]=(resp[k]||0)+1;});
+  const top=Object.entries(resp).sort((a,b)=>b[1]-a[1])[0]; L.push(`<b>${esc(top[0])}</b> concentra ${Math.round(top[1]/d.length*100)}% dos equipamentos (${top[1]}).`);
+  const semResp=d.filter(r=>!r['RESPONSAVÉL']).length; if(semResp) L.push(`<b>${semResp}</b> equipamento(s) sem responsável técnico definido.`);
+  const semInst=d.filter(r=>!r['INSTALAÇÃO']).length; if(semInst) L.push(`<b>${semInst}</b> registro(s) sem data de instalação — completar cadastro.`);
+  const loc=d.filter(r=>!r['LOCAÇÃO R$']||r['LOCAÇÃO R$']==='?').length; if(loc) L.push(`Valor de locação ausente/indefinido em <b>${loc}</b> registro(s).`);
+  const cat={}; d.forEach(r=>cat[r.CATEGORIA]=(cat[r.CATEGORIA]||0)+1); const tc=Object.entries(cat).sort((a,b)=>b[1]-a[1])[0]; L.push(`Categoria predominante: <b>${esc(tc[0])}</b> (${tc[1]} equip.).`);
+  const ser={}; d.forEach(r=>{ if(r.SERIAL!=='') ser[r.SERIAL]=(ser[r.SERIAL]||0)+1;}); const dup=Object.entries(ser).filter(x=>x[1]>1); if(dup.length) L.push(`⚠ Serial duplicado: ${dup.map(x=>esc(x[0])).join(', ')}.`);
+  return L;
+}
+function renderInsights(d){ $('#insights').innerHTML = insightsList(d).map(x=>`<li>${x}</li>`).join(''); }
+Chart.defaults.color='#8b97b1'; Chart.defaults.borderColor='#24304d'; Chart.defaults.font.family='Manrope';
+function chart(id,cfgc){ charts[id]?.destroy(); charts[id]=new Chart(document.getElementById(id),cfgc); }
+function renderCharts(d){
+  const c={vencida:0,proxima:0,emdia:0,sem:0}; d.forEach(r=>c[status(r)]++);
+  chart('chStatus',{type:'doughnut',data:{labels:Object.values(ST),datasets:[{data:Object.values(c),backgroundColor:['#ef4444','#f59e0b','#22c55e','#475569'],borderWidth:0}]},options:{cutout:'68%',plugins:{legend:{position:'bottom'}}}});
+  const cat={}; d.forEach(r=>cat[r.CATEGORIA]=(cat[r.CATEGORIA]||0)+1); const ce=Object.entries(cat).sort((a,b)=>b[1]-a[1]);
+  chart('chCat',{type:'bar',data:{labels:ce.map(x=>x[0]),datasets:[{data:ce.map(x=>x[1]),backgroundColor:'#14b8a6',borderRadius:6}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{precision:0}}},onClick:(e,el)=>{ if(el[0]){state.f.CATEGORIA=ce[el[0].index][0];buildFilters();render();} }}});
+  const months=[...Array(12)].map((_,i)=>new Date(today.getFullYear(),today.getMonth()+i,1));
+  const cnt=months.map(m=>d.filter(r=>{const x=pd(r['PROX.']);return x&&x.getFullYear()===m.getFullYear()&&x.getMonth()===m.getMonth();}).length);
+  chart('chAgenda',{type:'bar',data:{labels:months.map(m=>m.toLocaleDateString('pt-BR',{month:'short',year:'2-digit'})),datasets:[{data:cnt,backgroundColor:cnt.map((_,i)=>i===0?'#f59e0b':'#0ea5e9'),borderRadius:6}]},options:{plugins:{legend:{display:false}},scales:{y:{ticks:{precision:0}}}}});
+  const rs={}; d.forEach(r=>{const k=r['RESPONSAVÉL']||'—'; rs[k]=(rs[k]||0)+1;});
+  chart('chResp',{type:'polarArea',data:{labels:Object.keys(rs),datasets:[{data:Object.values(rs),backgroundColor:['#14b8a6aa','#0ea5e9aa','#6366f1aa','#f59e0baa','#22c55eaa','#ef4444aa']}]},options:{plugins:{legend:{position:'bottom'}},scales:{r:{ticks:{display:false}}}}});
+}
+function group(d){ const g={}; d.forEach(r=>{ (g[r.CLIENTE||'—']??={cnpj:new Set(),u:{}}); g[r.CLIENTE||'—'].cnpj.add(r.CNPJ); (g[r.CLIENTE||'—'].u[r.UNIDADE||'—']??=[]).push(r); }); return g; }
+function stSummary(list){ const c={vencida:0,proxima:0}; list.forEach(r=>{const s=status(r); if(c[s]!=null)c[s]++;}); return (c.vencida?`<span class="pill st-vencida">${c.vencida} vencida(s)</span>`:'')+(c.proxima?`<span class="pill st-proxima">${c.proxima} em 30d</span>`:'')+(!c.vencida&&!c.proxima?'<span class="pill st-emdia">OK</span>':''); }
+function renderTree(d){
+  const g=group(d); $('#treeCount').textContent=`${Object.keys(g).length} cliente(s)`;
+  $('#tree').innerHTML = Object.entries(g).map(([cli,o])=>{ const all=Object.values(o.u).flat();
+    return `<details open><summary><b>${esc(cli)}</b><span class="badge mono">${[...o.cnpj].filter(Boolean).map(esc).join(' · ')}</span><div class="spacer"></div>${stSummary(all)}<span class="badge">${Object.keys(o.u).length} unid. · ${all.length} equip.</span></summary>
+    ${Object.entries(o.u).map(([u,l])=>`<details class="unit"><summary>▸ <b>${esc(u)}</b><div class="spacer"></div>${stSummary(l)}<span class="badge">${l.length} equip.</span></summary><div class="eqs">
+      ${l.map(r=>`<div class="eq" data-id="${esc(r.ID)}"><div style="display:flex;justify-content:space-between;gap:6px"><b>${esc(r.EQUIPAMENTO)}</b>${pill(status(r))}</div><span style="color:var(--muted)">${esc(r.CATEGORIA)} · <span class="mono">${esc(r.SERIAL)}</span></span><br><span style="color:var(--muted)">Próx.: ${br(r['PROX.'])} · ${esc(r['RESPONSAVÉL']||'—')}</span></div>`).join('')}
+    </div></details>`).join('')}</details>`; }).join('') || '<div class="card">Nenhum resultado.</div>';
+  $('#tree').querySelectorAll('.eq').forEach(el=>el.onclick=()=>openForm(rows.find(r=>r.ID===el.dataset.id)));
+}
+function sorted(d){ const {k,d:dir}=state.sort; return [...d].sort((a,b)=>String(a[k]??'').localeCompare(String(b[k]??''),'pt',{numeric:true})*dir); }
+function renderTable(d){
+  $('#rowCount').textContent=`${d.length} de ${rows.length}`;
+  $('#table').innerHTML = `<thead><tr>${TABLE_COLS.map(c=>`<th data-k="${c}">${c}${state.sort.k===c?(state.sort.d>0?' ↑':' ↓'):''}</th>`).join('')}<th>Status</th><th></th></tr></thead><tbody>
+  ${sorted(d).map(r=>`<tr>${TABLE_COLS.map(c=>`<td class="${['SERIAL','CD PAT'].includes(c)?'mono':''}">${DATE_COLS.includes(c)?br(r[c]):esc(r[c]||'—')}</td>`).join('')}<td>${pill(status(r))}</td><td><button class="btn sm" data-e="${esc(r.ID)}">Editar</button> <button class="btn sm danger" data-d="${esc(r.ID)}">✕</button></td></tr>`).join('')}</tbody>`;
+  $('#table').querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{ state.sort={k:th.dataset.k,d:state.sort.k===th.dataset.k?-state.sort.d:1}; render(); });
+  $('#table').querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>openForm(rows.find(r=>r.ID===b.dataset.e)));
+  $('#table').querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>del(b.dataset.d));
+}
+
+/* ======================= CRUD ======================= */
+function openForm(r){
+  current = r||null; $('#fTitle').textContent = r?`Editar · ${r.EQUIPAMENTO}`:'Novo equipamento'; $('#fDel').style.display=r?'':'none';
+  const base = r || {CLIENTE:state.f.CLIENTE||'',UNIDADE:state.f.UNIDADE||'',REGIÃO:state.f['REGIÃO']||''};
+  $('#fBody').innerHTML = COLS.map(c=>`<div class="field"><label>${c}</label><input name="${c}" ${DATE_COLS.includes(c)?'type="date"':''} list="dl-${norm(c).replace(/\W/g,'')}" value="${esc(base[c]??'')}" ${['CLIENTE','UNIDADE','EQUIPAMENTO'].includes(c)?'required':''}></div>`).join('')
+    + ["CLIENTE","UNIDADE","CATEGORIA","RESPONSAVÉL","REGIÃO","EQUIPAMENTO"].map(c=>`<datalist id="dl-${norm(c).replace(/\W/g,'')}">${uniq(c).map(v=>`<option value="${esc(v)}">`).join('')}</datalist>`).join('');
+  const prev=$('#fBody [name="PREV. ATUAL"]'), prox=$('#fBody [name="PROX."]');
+  prev.addEventListener('change',()=>{ if(prev.value && !prox.value){ const d=pd(prev.value); d.setDate(d.getDate()+180); prox.value=d.toISOString().slice(0,10); toast('Próxima preventiva sugerida: +180 dias'); }});
+  $('#mForm').classList.add('open');
+}
+async function saveForm(e){
+  e.preventDefault(); const rec={...(current||{})}; new FormData($('#form')).forEach((v,k)=>rec[k]=String(v).trim());
+  if(rec.SERIAL && rows.some(r=>r.ID!==rec.ID && String(r.SERIAL)===rec.SERIAL) && !confirm('Já existe um equipamento com este serial. Salvar mesmo assim?')) return;
+  busy(true);
+  try{ await api('POST',{action:current?'update':'create',record:rec}); closeM('mForm'); toast(current?'Registro atualizado':'Registro criado'); await reload(); }
+  catch(err){ toast('Erro: '+err.message); } busy(false);
+}
+async function del(id){ const r=rows.find(x=>x.ID===id); if(!confirm(`Excluir ${r?.EQUIPAMENTO} (${r?.SERIAL})?`)) return;
+  busy(true); try{ await api('POST',{action:'delete',id}); closeM('mForm'); toast('Registro excluído'); await reload(); }catch(err){ toast('Erro: '+err.message); } busy(false); }
+const delCurrent = () => current && del(current.ID);
+const closeM = id => $('#'+id).classList.remove('open');
+document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
+/* ======================= EXCEL ======================= */
+function filterSummary(){
+  const L=[];
+  if(state.q) L.push(['Busca',state.q]);
+  for(const [k,v] of Object.entries(state.f)){ if(!v) continue;
+    const lbl=(FILTERS.find(f=>f[0]===k)||[,k==='_de'?'Próx. preventiva de':'Próx. preventiva até'])[1];
+    L.push([lbl, k==='_status'?ST[v]:(k[0]==='_'?br(v):v)]); }
+  return L.length?L:[['Filtros','Nenhum (todos os registros)']];
+}
+async function exportXlsx(){
+  if(!window.ExcelJS){ toast('Biblioteca Excel não carregada'); return; }
+  busy(true);
+  try{
+  const d=sorted(filtered()), now=new Date();
+  const INK='FF0F172A', BRAND='FF14B8A6', ZEBRA='FFF8FAFC', LINE='FFE2E8F0', MUTED='FF64748B';
+  const STC={vencida:['FFFEE2E2','FFB91C1C'],proxima:['FFFEF3C7','FFB45309'],emdia:['FFDCFCE7','FF15803D'],sem:['FFF1F5F9','FF64748B']};
+  const F={name:'Arial',size:10}, thin={style:'thin',color:{argb:LINE}}, box={top:thin,left:thin,bottom:thin,right:thin};
+  const wb=new ExcelJS.Workbook(); wb.creator='Patrimônio · Gestão de Equipamentos'; wb.created=now;
+  const toDate=s=>{const x=pd(s); return x?new Date(Date.UTC(x.getFullYear(),x.getMonth(),x.getDate())):null;};
+  const title=(ws,text,cols)=>{
+    ws.mergeCells(1,1,1,cols); const c=ws.getCell(1,1); c.value=text;
+    c.font={name:'Arial',size:16,bold:true,color:{argb:'FFFFFFFF'}}; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:INK}}; c.alignment={vertical:'middle',indent:1}; ws.getRow(1).height=30;
+    ws.mergeCells(2,1,2,cols); const s=ws.getCell(2,1);
+    s.value=`Gerado em ${now.toLocaleString('pt-BR')} · ${d.length} de ${rows.length} registros · Fonte: ${LIVE?'Google Sheets – Patrimônio aferido':'Modo demonstração'}`;
+    s.font={name:'Arial',size:9,italic:true,color:{argb:MUTED}}; s.border={bottom:{style:'medium',color:{argb:BRAND}}}; s.alignment={indent:1};
+  };
+  const head=(row)=>row.eachCell(c=>{ c.font={name:'Arial',size:10,bold:true,color:{argb:'FFFFFFFF'}}; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:INK}}; c.alignment={vertical:'middle',horizontal:'center',wrapText:true}; c.border=box; });
+
+  /* --- Aba 1: Resumo --- */
+  const r1=wb.addWorksheet('Resumo',{views:[{showGridLines:false}],pageSetup:{orientation:'portrait',paperSize:9,fitToPage:true,fitToWidth:1,fitToHeight:0}});
+  r1.columns=[{width:34},{width:16},{width:14},{width:14},{width:14},{width:14},{width:14}];
+  title(r1,'Relatório de Patrimônio — Resumo',7);
+  let y=4; const sec=t=>{ const c=r1.getCell(y,1); c.value=t; c.font={name:'Arial',size:11,bold:true,color:{argb:INK}}; r1.getRow(y).height=20; y++; };
+  sec('Filtros aplicados');
+  filterSummary().forEach(([k,v])=>{ const a=r1.getCell(y,1), b=r1.getCell(y,2); a.value=k; b.value=v; r1.mergeCells(y,2,y,7);
+    a.font={...F,bold:true}; b.font=F; a.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF0FDFA'}}; [a,b].forEach(c=>c.border=box); y++; });
+  y++; sec('Indicadores');
+  const c={vencida:0,proxima:0,emdia:0,sem:0}; d.forEach(r=>c[status(r)]++);
+  const kStart=y+1;
+  r1.getRow(y).values=['Indicador','Valor']; head(r1.getRow(y)); y++;
+  const K=[['Equipamentos',d.length],['Clientes',new Set(d.map(r=>r.CLIENTE)).size],['Unidades',new Set(d.map(r=>r.CLIENTE+'|'+r.UNIDADE)).size],['Categorias',new Set(d.map(r=>r.CATEGORIA)).size],
+    ['Vencidas',c.vencida],['Vencem em 30 dias',c.proxima],['Em dia',c.emdia],['Sem data',c.sem]];
+  K.forEach(([k,v],i)=>{ const row=r1.getRow(y); row.values=[k,v]; row.eachCell(x=>{x.font=F;x.border=box; if(i%2) x.fill={type:'pattern',pattern:'solid',fgColor:{argb:ZEBRA}};}); row.getCell(2).alignment={horizontal:'center'}; y++; });
+  const cf=r1.getRow(y); cf.values=['Conformidade (em dia + 30 dias)']; const cc=cf.getCell(2);
+  cc.value={formula:`IF(B${kStart}=0,0,(B${kStart+5}+B${kStart+6})/B${kStart})`}; cc.numFmt='0.0%';
+  cf.eachCell(x=>{x.font={...F,bold:true};x.border=box;}); cc.alignment={horizontal:'center'}; y+=2;
+  sec('Por cliente');
+  const hr=r1.getRow(y); hr.values=['Cliente','Unidades','Equip.','Em dia','30 dias','Vencidas','Sem data']; head(hr); y++;
+  const g=group(d), first=y;
+  Object.entries(g).forEach(([cli,o],i)=>{ const all=Object.values(o.u).flat(), s={vencida:0,proxima:0,emdia:0,sem:0}; all.forEach(r=>s[status(r)]++);
+    const row=r1.getRow(y); row.values=[cli,Object.keys(o.u).length,all.length,s.emdia,s.proxima,s.vencida,s.sem];
+    row.eachCell({includeEmpty:true},(x,n)=>{ x.font=n===6&&s.vencida?{...F,bold:true,color:{argb:STC.vencida[1]}}:F; x.border=box; if(n>1)x.alignment={horizontal:'center'}; if(i%2)x.fill={type:'pattern',pattern:'solid',fgColor:{argb:ZEBRA}}; }); y++; });
+  if(y>first){ const t=r1.getRow(y); t.getCell(1).value='TOTAL'; ['B','C','D','E','F','G'].forEach((L,i)=>t.getCell(i+2).value={formula:`SUM(${L}${first}:${L}${y-1})`});
+    t.eachCell(x=>{x.font={...F,bold:true};x.border={...box,top:{style:'medium',color:{argb:INK}}};x.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE2E8F0'}}; }); for(let n=2;n<=7;n++) t.getCell(n).alignment={horizontal:'center'}; }
+
+  /* --- Aba 2: Registros --- */
+  const ws=wb.addWorksheet('Registros',{views:[{state:'frozen',ySplit:4,xSplit:2,showGridLines:false}],pageSetup:{orientation:'landscape',paperSize:9,fitToPage:true,fitToWidth:1,fitToHeight:0,printTitlesRow:'4:4'}});
+  const XC=["CLIENTE","CNPJ","UNIDADE","REGIÃO","CATEGORIA","EQUIPAMENTO","SERIAL","CD PAT","SETOR","TEC","RESPONSAVÉL","INSTALAÇÃO","PREV. ATUAL","PROX.","_dias","_status","LOCAÇÃO R$","TROCA DE LÂMP","TROCA DE PROB","TROCA REFER","TROCA DA LS","OBS"];
+  const LBL={_dias:'DIAS P/ PRÓX.',_status:'STATUS',"RESPONSAVÉL":'RESPONSÁVEL'};
+  const W={CLIENTE:38,UNIDADE:32,EQUIPAMENTO:24,OBS:40,CNPJ:20,CATEGORIA:18};
+  ws.columns=XC.map(k=>({key:k,width:W[k]||(DATE_COLS.includes(k)?13:14)}));
+  title(ws,'Relatório de Patrimônio — Registros',XC.length);
+  ws.mergeCells(3,1,3,XC.length); const fl=ws.getCell(3,1); fl.value='Filtros: '+filterSummary().map(([k,v])=>`${k}: ${v}`).join('  ·  '); fl.font={name:'Arial',size:9,color:{argb:INK}}; fl.alignment={indent:1};
+  const h=ws.getRow(4); h.values=XC.map(k=>LBL[k]||k); h.height=28; head(h);
+  d.forEach((r,i)=>{
+    const st=status(r), row=ws.getRow(5+i);
+    row.values=XC.map(k=>{ if(k==='_dias') return days(r['PROX.']); if(k==='_status') return ST[st];
+      if(DATE_COLS.includes(k)) return toDate(r[k]);
+      const v=r[k]; if(k==='LOCAÇÃO R$'){ const n=Number(String(v).replace(/[^\d,.-]/g,'').replace(/\.(?=\d{3})/g,'').replace(',','.')); return v!==''&&v!=null&&!isNaN(n)&&/\d/.test(String(v))?n:(v||null); }
+      return v===''||v==null?null:v; });
+    row.eachCell({includeEmpty:true},(x,n)=>{ const k=XC[n-1]; x.font=F; x.border=box; x.alignment={vertical:'middle'};
+      if(i%2) x.fill={type:'pattern',pattern:'solid',fgColor:{argb:ZEBRA}};
+      if(DATE_COLS.includes(k)){ x.numFmt='dd/mm/yyyy'; x.alignment={horizontal:'center'}; }
+      if(k==='_dias'||k==='CD PAT'||k==='SERIAL') x.alignment={horizontal:'center'};
+      if(k==='LOCAÇÃO R$' && typeof x.value==='number') x.numFmt='"R$" #,##0.00;[Red]("R$" #,##0.00);"-"';
+      if(k==='_status'){ x.fill={type:'pattern',pattern:'solid',fgColor:{argb:STC[st][0]}}; x.font={...F,bold:true,color:{argb:STC[st][1]}}; x.alignment={horizontal:'center'}; }
+      if(k==='_dias' && st==='vencida') x.font={...F,bold:true,color:{argb:STC.vencida[1]}};
+    });
+  });
+  ws.autoFilter={from:{row:4,column:1},to:{row:Math.max(4,4+d.length),column:XC.length}};
+
+  /* --- Aba 3: Por categoria --- */
+  const ct=wb.addWorksheet('Por categoria',{views:[{showGridLines:false}]});
+  ct.columns=[{width:30},{width:14},{width:14}];
+  title(ct,'Equipamentos por categoria',3);
+  const ch=ct.getRow(4); ch.values=['Categoria','Equipamentos','% do total']; head(ch);
+  const cat={}; d.forEach(r=>cat[r.CATEGORIA||'—']=(cat[r.CATEGORIA||'—']||0)+1);
+  const ce=Object.entries(cat).sort((a,b)=>b[1]-a[1]), last=4+ce.length;
+  ce.forEach(([k,v],i)=>{ const row=ct.getRow(5+i); row.values=[k,v]; row.getCell(3).value={formula:`IF(SUM($B$5:$B$${last})=0,0,B${5+i}/SUM($B$5:$B$${last}))`}; row.getCell(3).numFmt='0.0%';
+    row.eachCell({includeEmpty:true},(x,n)=>{x.font=F;x.border=box;if(n>1)x.alignment={horizontal:'center'};if(i%2)x.fill={type:'pattern',pattern:'solid',fgColor:{argb:ZEBRA}};}); });
+  if(ce.length){ const t=ct.getRow(last+1); t.values=['TOTAL',{formula:`SUM(B5:B${last})`}]; t.getCell(3).value={formula:`SUM(C5:C${last})`}; t.getCell(3).numFmt='0.0%';
+    t.eachCell(x=>{x.font={...F,bold:true};x.border={...box,top:{style:'medium',color:{argb:INK}}};x.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE2E8F0'}};}); [2,3].forEach(n=>t.getCell(n).alignment={horizontal:'center'}); }
+
+  const buf=await wb.xlsx.writeBuffer();
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+  a.download=`patrimonio_${now.toISOString().slice(0,10)}.xlsx`; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  toast(`Excel gerado com ${d.length} registro(s)`);
+  }catch(e){ toast('Erro ao gerar Excel: '+e.message); }
+  busy(false);
+}
+
+/* ======================= PDF ======================= */
+function buildPdf(){
+  const { jsPDF } = window.jspdf; const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const d=sorted(filtered()), W=doc.internal.pageSize.getWidth(), H=doc.internal.pageSize.getHeight();
+  const C={ink:[15,23,42],brand:[20,184,166],muted:[100,116,139],line:[226,232,240]};
+  // Capa / cabeçalho
+  doc.setFillColor(...C.ink); doc.rect(0,0,W,30,'F'); doc.setFillColor(...C.brand); doc.rect(0,30,W,1.2,'F');
+  doc.setTextColor(255); doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.text('Relatório de Patrimônio',14,14);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.text('Equipamentos, unidades e status de manutenção preventiva',14,21);
+  doc.text('Emitido em '+new Date().toLocaleString('pt-BR'),W-14,14,{align:'right'}); doc.text(`${d.length} equipamento(s) no cenário`,W-14,21,{align:'right'});
+  // Filtros aplicados
+  let y=40; doc.setTextColor(...C.muted); doc.setFontSize(8.5);
+  const fl=[]; if(state.q) fl.push('Busca: '+state.q); for(const [k,v] of Object.entries(state.f)) if(v) fl.push(`${(FILTERS.find(f=>f[0]===k)||[,k==='_de'?'De':'Até'])[1]}: ${k==='_status'?ST[v]:(k[0]==='_'?br(v):v)}`);
+  doc.text('FILTROS APLICADOS: '+(fl.join('  ·  ')||'Nenhum (visão completa)'),14,y);
+  // KPIs
+  y+=6; const c={vencida:0,proxima:0,emdia:0,sem:0}; d.forEach(r=>c[status(r)]++); const n=d.length||1;
+  const K=[['Equipamentos',d.length,C.brand],['Clientes',new Set(d.map(r=>r.CLIENTE)).size,[14,165,233]],['Unidades',new Set(d.map(r=>r.CLIENTE+r.UNIDADE)).size,[99,102,241]],['Conformidade',Math.round((c.emdia+c.proxima)/n*100)+'%',[34,197,94]],['Vencidas',c.vencida,[239,68,68]],['Vencem em 30d',c.proxima,[245,158,11]]];
+  const bw=(W-28-5*4)/6;
+  K.forEach(([l,v,col],i)=>{ const x=14+i*(bw+4); doc.setDrawColor(...C.line); doc.setFillColor(248,250,252); doc.roundedRect(x,y,bw,20,2,2,'FD'); doc.setFillColor(...col); doc.rect(x,y+3,1.2,14,'F');
+    doc.setTextColor(...C.muted); doc.setFontSize(7.5); doc.text(l.toUpperCase(),x+5,y+7); doc.setTextColor(...C.ink); doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.text(String(v),x+5,y+16); doc.setFont('helvetica','normal'); });
+  // Insights
+  y+=28; doc.setTextColor(...C.ink); doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text('Destaques',14,y); doc.setFont('helvetica','normal'); doc.setFontSize(8.8); doc.setTextColor(51,65,85);
+  insightsList(d).slice(0,6).forEach(t=>{ y+=5.2; doc.text('•  '+t.replace(/<[^>]+>/g,''),16,y,{maxWidth:W-32}); });
+  // Resumo por cliente/unidade
+  y+=8; const g=group(d); const sumRows=[];
+  Object.entries(g).forEach(([cli,o])=>Object.entries(o.u).forEach(([u,l])=>{ const s={vencida:0,proxima:0,emdia:0,sem:0}; l.forEach(r=>s[status(r)]++); sumRows.push([cli,[...o.cnpj].filter(Boolean).join(', '),u,l.length,s.emdia,s.proxima,s.vencida,s.sem]); }));
+  doc.autoTable({startY:y,head:[['Cliente','CNPJ','Unidade','Equip.','Em dia','30 dias','Vencidas','Sem data']],body:sumRows,theme:'grid',
+    headStyles:{fillColor:C.ink,fontSize:8},styles:{fontSize:8,cellPadding:2,lineColor:C.line},columnStyles:{3:{halign:'center'},4:{halign:'center'},5:{halign:'center'},6:{halign:'center',textColor:[185,28,28]},7:{halign:'center'}},margin:{left:14,right:14}});
+  // Detalhamento agrupado
+  Object.entries(g).forEach(([cli,o])=>Object.entries(o.u).forEach(([u,l])=>{
+    let sy=doc.lastAutoTable.finalY+9; if(sy>H-40){ doc.addPage(); sy=20; }
+    doc.setFillColor(240,253,250); doc.rect(14,sy-5,W-28,8,'F'); doc.setTextColor(...C.ink); doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.text(`${cli}  ›  ${u}`,16,sy); doc.setFont('helvetica','normal');
+    doc.autoTable({startY:sy+4,head:[['Categoria','Equipamento','Serial','Patrim.','Instalação','Últ. prev.','Próx. prev.','Dias','Responsável','Status']],
+      body:l.map(r=>[r.CATEGORIA,r.EQUIPAMENTO,r.SERIAL,r['CD PAT'],br(r['INSTALAÇÃO']),br(r['PREV. ATUAL']),br(r['PROX.']),days(r['PROX.'])??'—',r['RESPONSAVÉL']||'—',ST[status(r)]]),
+      theme:'striped',headStyles:{fillColor:[30,41,59],fontSize:7.8},styles:{fontSize:7.8,cellPadding:1.8},alternateRowStyles:{fillColor:[248,250,252]},margin:{left:14,right:14,top:20},
+      didParseCell:h=>{ if(h.section==='body'&&h.column.index===9){ const v=h.cell.raw; h.cell.styles.fontStyle='bold'; h.cell.styles.textColor= v===ST.vencida?[185,28,28]:v===ST.proxima?[180,83,9]:v===ST.emdia?[21,128,61]:[100,116,139]; } }});
+  }));
+  // Rodapé
+  const pages=doc.getNumberOfPages();
+  for(let i=1;i<=pages;i++){ doc.setPage(i); doc.setDrawColor(...C.line); doc.line(14,H-10,W-14,H-10); doc.setFontSize(7.5); doc.setTextColor(...C.muted);
+    doc.text('Relatório gerado automaticamente · Fonte: Google Sheets – Patrimônio aferido',14,H-5.5); doc.text(`Página ${i} de ${pages}`,W-14,H-5.5,{align:'right'}); }
+  return doc;
+}
+function openPdf(){ busy(true); setTimeout(()=>{ pdfDoc=buildPdf(); $('#pdfFrame').src=pdfDoc.output('bloburl'); $('#mPdf').classList.add('open'); busy(false); },30); }
+function downloadPdf(){ pdfDoc && pdfDoc.save(`patrimonio_${new Date().toISOString().slice(0,10)}.pdf`); }
+
+reload();
+</script>
+</body>
+</html>

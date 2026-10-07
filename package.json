@@ -1,0 +1,7 @@
+{
+  "name": "patrimonio-dashboard",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Dashboard + CRUD de patrimônio sobre Google Sheets, com proxy seguro na Vercel",
+  "engines": { "node": ">=18" }
+}
