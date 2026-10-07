@@ -342,7 +342,13 @@ function pickUnit(c,u,on){ const own=x=>Object.prototype.hasOwnProperty.call(sta
   else { if(!C.includes(c)) return; if(U===null) U=unitsOf(C); U=U.filter(x=>x!==u); if(!clientUnits(c).some(x=>U.includes(x))) C=C.filter(x=>x!==c); }
   if(!C.length){ delete state.f.CLIENTE; delete state.f.UNIDADE; } else { state.f.CLIENTE=C; state.f.UNIDADE=U; } }
 function clientUnits(c){ return [...new Set(rows.filter(r=>String(r.CLIENTE)===String(c)).map(r=>r.UNIDADE).filter(v=>v!==''&&v!=null).map(String))].sort(); }
-document.addEventListener('click',e=>{ document.querySelectorAll('.ms.open').forEach(m=>{ if(!m.contains(e.target)){ m.classList.remove('open'); if(m._dirty){ buildFilters(); render(); } } }); });
+function resetPop(m){ const i=m.querySelector('input[type=search]'); if(i) i.value=''; m.querySelectorAll('.opts label').forEach(l=>l.style.display=''); const u=m.querySelector('.uopts'); if(u) u.innerHTML=''; m._hits=[]; }
+function stripQ(keys){ const al=Object.keys(ALIAS).filter(a=>keys.includes(ALIAS[a])); if(!al.length||!state.q) return;
+  state.q=state.q.replace(new RegExp('(?:^|\\s)(?:'+al.join('|')+'):("[^"]+"|\\S+)','gi'),' ').replace(/\s+/g,' ').trim(); $('#q').value=state.q; }
+document.addEventListener('click',e=>{ const tm=e.target.closest&&e.target.closest('.ms'); let rebuild=false;
+  document.querySelectorAll('.ms.open').forEach(m=>{ if(!m.contains(e.target)){ m.classList.remove('open'); resetPop(m); if(m._dirty) rebuild=true; } });
+  if(rebuild){ const reopen=tm&&tm.classList.contains('open')?tm.dataset.k:null; buildFilters(); render();
+    if(reopen){ const n=document.querySelector('.ms[data-k="'+reopen+'"]'); if(n){ n.classList.add('open'); n.querySelector('input[type=search]').focus(); } } } });
 function buildFilters(){
   $('#filters').innerHTML = FILTERS.map(([k,l])=>{ const a=Object.prototype.hasOwnProperty.call(state.f,k)?sel(k):uniqFor(k).map(String); const lab=a.length?(a.length===1?(k==='_status'?ST[a[0]]:a[0]):a.length+' selecionados'):(Object.prototype.hasOwnProperty.call(state.f,k)?'Nenhum':'Todos');
     return `<div><label>${l}</label><div class="ms" data-k="${k}"><button type="button">${esc(lab)} ▾</button><div class="pop"><input type="search" placeholder="Buscar…"><label class="all-options"><input type="checkbox" data-all aria-label="Marcar/desmarcar todas as opções de ${l}">Marcar/desmarcar todas</label><div class="uopts"></div><div class="opts">${uniqFor(k).map(v=>`<label data-n="${esc(norm(k==='_status'?ST[v]:v))}"><input type="checkbox" value="${esc(v)}" ${a.includes(String(v))?'checked':''}>${esc(k==='_status'?ST[v]:v)}</label>`).join('')}</div><div class="acts"><button type="button" class="btn sm" data-a="clr">Limpar</button><button type="button" class="btn sm primary" data-a="ok">Aplicar</button></div></div></div></div>`; }).join('')
@@ -351,10 +357,10 @@ function buildFilters(){
   $('#filters').querySelectorAll('.ms').forEach(m=>{ const k=m.dataset.k;
     m.querySelector(':scope>button').onclick=()=>{ const o=m.classList.contains('open'); document.querySelectorAll('.ms.open').forEach(x=>x!==m&&x.classList.remove('open')); m.classList.toggle('open',!o); if(!o) m.querySelector('input[type=search]').focus(); };
     const uo=m.querySelector('.uopts');
-    const renderUnitHits=ts=>{ uo.innerHTML=''; if(k!=='CLIENTE'||!ts.length) return; const hits=[];
+    const renderUnitHits=ts=>{ uo.innerHTML=''; m._hits=[]; if(k!=='CLIENTE'||!ts.length) return; const hits=[];
       uniqFor('CLIENTE').forEach(c=>{ const cn=norm(c); if(ts.every(t=>cn.includes(t))) return;
         clientUnits(c).forEach(u=>{ const un=norm(u); if(ts.some(t=>un.includes(t))&&ts.every(t=>(cn+' '+un).includes(t))) hits.push([c,u]); }); });
-      const hasC=Object.prototype.hasOwnProperty.call(state.f,'CLIENTE'), hasU=Object.prototype.hasOwnProperty.call(state.f,'UNIDADE');
+      m._hits=hits; const hasC=Object.prototype.hasOwnProperty.call(state.f,'CLIENTE'), hasU=Object.prototype.hasOwnProperty.call(state.f,'UNIDADE');
       uo.innerHTML=hits.length?`<div class="uhead">Unidades encontradas</div>`+hits.slice(0,30).map(([c,u])=>`<label><input type="checkbox" data-uc="${esc(c)}" data-uu="${esc(u)}" ${hasC&&sel('CLIENTE').includes(c)&&(!hasU||sel('UNIDADE').includes(u))?'checked':''}>${esc(u)}<small>${esc(c)}</small></label>`).join(''):'';
       uo.querySelectorAll('input').forEach(c=>c.onchange=()=>{ pickUnit(c.dataset.uc,c.dataset.uu,c.checked); options.forEach(o=>o.checked=sel('CLIENTE').includes(o.value)); syncAll(); m._dirty=true; render(); }); };
     m.querySelector('input[type=search]').oninput=e=>{ const ts=norm(e.target.value).split(/\s+/).filter(Boolean);
@@ -362,11 +368,21 @@ function buildFilters(){
       renderUnitHits(ts); syncAll(); };
     const all=m.querySelector('[data-all]'), options=[...m.querySelectorAll('.opts input')];
     const syncAll=()=>{ const n=options.filter(c=>c.checked).length; all.checked=options.length>0&&n===options.length; all.indeterminate=n>0&&n<options.length; all.disabled=!options.length; };
-    const updateSelection=()=>{ state.f[k]=options.filter(c=>c.checked).map(c=>c.value); m._dirty=true; syncAll(); render(); };
+    const searching=()=>m.querySelector('input[type=search]').value.trim()!=='';
+    const updateSelection=()=>{ if(searching()&&!Object.prototype.hasOwnProperty.call(state.f,k)) options.forEach(c=>{ if(c.parentElement.style.display==='none') c.checked=false; });
+      state.f[k]=options.filter(c=>c.checked).map(c=>c.value); m._dirty=true; syncAll(); render(); };
     all.onchange=()=>{ options.forEach(c=>{ if(c.parentElement.style.display!=='none') c.checked=all.checked; }); updateSelection(); };
     options.forEach(c=>c.onchange=updateSelection); syncAll();
-    m.querySelector('[data-a=clr]').onclick=()=>{ delete state.f[k]; if(k==='CLIENTE') delete state.f.UNIDADE; buildFilters(); render(); };
-    m.querySelector('[data-a=ok]').onclick=()=>{ m.classList.remove('open'); if(k==='CLIENTE'&&Object.prototype.hasOwnProperty.call(state.f,'UNIDADE')&&sel('UNIDADE').length){ const ok=uniqFor('UNIDADE').map(String), keep=sel('UNIDADE').filter(u=>ok.includes(u)); if(keep.length) state.f.UNIDADE=keep; else delete state.f.UNIDADE; } buildFilters(); render(); };
+    m.querySelector('[data-a=clr]').onclick=()=>{ delete state.f[k]; if(k==='CLIENTE') delete state.f.UNIDADE; if(k==='CLIENTE'||k==='UNIDADE') stripQ(k==='CLIENTE'?['CLIENTE','UNIDADE']:['UNIDADE']); buildFilters(); render(); };
+    m.querySelector('[data-a=ok]').onclick=()=>{
+      /* busca digitada e filtro ainda em "Todos": Aplicar restringe ao que a busca encontrou */
+      if(searching()&&!Object.prototype.hasOwnProperty.call(state.f,k)){
+        const vis=options.filter(c=>c.parentElement.style.display!=='none').map(c=>c.value), hits=m._hits||[];
+        if(vis.length||hits.length){ if(vis.length||k!=='CLIENTE') state.f[k]=vis; else delete state.f[k]; if(k==='CLIENTE') hits.forEach(([c,u])=>pickUnit(c,u,true)); } }
+      m.classList.remove('open'); resetPop(m);
+      if(k==='CLIENTE'&&Object.prototype.hasOwnProperty.call(state.f,'UNIDADE')&&sel('UNIDADE').length){ const ok=uniqFor('UNIDADE').map(String), keep=sel('UNIDADE').filter(u=>ok.includes(u)); if(keep.length) state.f.UNIDADE=keep; else delete state.f.UNIDADE; }
+      if(k==='CLIENTE'||k==='UNIDADE') stripQ(k==='CLIENTE'?['CLIENTE','UNIDADE']:['UNIDADE']);
+      buildFilters(); render(); };
   });
 }
 function parseQuery(q){
