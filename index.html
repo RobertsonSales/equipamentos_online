@@ -185,8 +185,14 @@ async function api(method, payload){
   return method==='GET' ? j.data.rows : j.data;
 }
 async function probe(){
-  if(location.protocol==='file:') return false;
-  try{ const r=await fetch(API+'?ping=1',{cache:'no-store'}); const j=await r.json(); return !!(j.ok&&j.configured); }catch{ return false; }
+  if(location.protocol==='file:') return {live:false,reason:'Página aberta como arquivo local (file://). Acesse pela URL da Vercel.'};
+  try{
+    const r=await fetch(API+'?ping=1',{cache:'no-store'});
+    const j=await r.json().catch(()=>null);
+    if(!j) return {live:false,reason:'/api/patrimonio respondeu HTTP '+r.status+' sem JSON: a função não foi implantada (a pasta api/ precisa estar na raiz do repositório).'};
+    if(!j.configured) return {live:false,reason:'Variáveis APPS_SCRIPT_URL / APPS_SCRIPT_TOKEN ausentes neste deployment. Cadastre na Vercel (ambiente Production) e faça Redeploy.'};
+    return {live:true};
+  }catch(e){ return {live:false,reason:'Falha ao chamar /api/patrimonio: '+e.message}; }
 }
 function demo(method,p){
   let db = JSON.parse(localStorage.getItem('pat_demo')||'null') || SEED;
@@ -197,14 +203,20 @@ function demo(method,p){
   localStorage.setItem('pat_demo',JSON.stringify(db)); return p.record||{};
 }
 const busy = on => $('#loader').classList.toggle('on',on);
-function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2800); }
+function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),Math.max(2800,m.length*60)); }
 
 async function reload(){
   busy(true);
-  try{ LIVE = await probe(); rows = (await api('GET')).map(r=>({...r})); const live=LIVE;
-    $('#mode').className='badge '+(live?'live':'demo'); $('#mode').textContent= live?'● Conectado ao Google Sheets':'Modo demonstração';
+  try{
+    const p = await probe(); LIVE = p.live;
+    if(!LIVE && p.reason){ console.warn('[Patrimônio] Modo demonstração:', p.reason); toast(p.reason); }
+    rows = (await api('GET')).map(r=>({...r}));
+    const m=$('#mode');
+    m.className='badge '+(LIVE?'live':'demo');
+    m.textContent = LIVE ? '● Conectado ao Google Sheets' : 'Modo demonstração';
+    m.title = LIVE ? '' : (p.reason||'');
     buildFilters(); render();
-  }catch(e){ toast('Erro ao carregar: '+e.message); }
+  }catch(e){ console.error(e); toast('Erro ao carregar: '+e.message); }
   busy(false);
 }
 
