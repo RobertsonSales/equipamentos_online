@@ -118,6 +118,8 @@ iframe.pdf{width:100%;height:78vh;border:0;border-radius:0 0 18px 18px;backgroun
 .filters input[type=checkbox]{width:14px;height:14px;min-width:14px;padding:0;margin:0;background:none;border:0;appearance:auto;accent-color:var(--brand);flex:none;cursor:pointer}
 .ms .opts label{display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text);padding:5px 6px;border-radius:6px;cursor:pointer;margin:0}
 .ms .opts label:hover{background:#ffffff0d}
+.ms .all-options{display:flex;align-items:center;gap:8px;padding:8px 6px;margin:0 0 6px;border-bottom:1px solid var(--line);font-size:13px;color:var(--text);text-transform:none;letter-spacing:0;cursor:pointer}
+.modal .hd{gap:14px;flex-wrap:wrap}.modal .hd h3{flex:1;min-width:180px;overflow-wrap:anywhere}.transfer-search{flex:1;min-width:230px}.transfer-search .suggest{z-index:55}.modal .hd .transfer-search input{width:100%}
 .ms .acts{display:flex;justify-content:space-between;margin-top:6px}
 .ac{position:relative}.ac .suggest div{font-size:13px}
 .ebtn{border:1px solid var(--line);background:var(--panel2);border-radius:7px;cursor:pointer;padding:2px 7px;margin-right:6px;font-size:12px}
@@ -172,7 +174,7 @@ iframe.pdf{width:100%;height:78vh;border:0;border-radius:0 0 18px 18px;backgroun
 
 <!-- Formulário -->
 <div class="modal" id="mForm"><div class="box">
-  <div class="hd"><h3 id="fTitle" style="margin:0">Equipamento</h3><div class="spacer"></div><button class="btn sm" onclick="closeM('mForm')">✕</button></div>
+  <div class="hd"><h3 id="fTitle" style="margin:0">Equipamento</h3><div id="fTransferSearch" class="field ac transfer-search"></div><button class="btn sm" onclick="closeM('mForm')">✕</button></div>
   <form id="form" onsubmit="saveForm(event)"><div class="bd" id="fBody"></div>
   <div class="ft"><button type="button" class="btn danger" id="fDel" onclick="delCurrent()">Excluir</button><div class="spacer"></div><button type="button" class="btn" onclick="closeM('mForm')">Cancelar</button><button class="btn primary">Salvar</button></div></form>
 </div></div>
@@ -276,15 +278,19 @@ function toggleF(k,v){ const a=sel(k); state.f[k]=a.includes(v)?a.filter(x=>x!==
 function uniqFor(k){ if(k!=='UNIDADE'||!sel('CLIENTE').length) return uniq(k); const c=sel('CLIENTE'); return [...new Set(rows.filter(r=>c.includes(String(r.CLIENTE))).map(r=>r.UNIDADE).filter(v=>v!==''&&v!=null))].sort(); }
 document.addEventListener('click',e=>{ document.querySelectorAll('.ms.open').forEach(m=>{ if(!m.contains(e.target)){ m.classList.remove('open'); if(m._dirty){ buildFilters(); render(); } } }); });
 function buildFilters(){
-  $('#filters').innerHTML = FILTERS.map(([k,l])=>{ const a=sel(k); const lab=a.length?(a.length===1?(k==='_status'?ST[a[0]]:a[0]):a.length+' selecionados'):'Todos';
-    return `<div><label>${l}</label><div class="ms" data-k="${k}"><button type="button">${esc(lab)} ▾</button><div class="pop"><input type="search" placeholder="Buscar…"><div class="opts">${uniqFor(k).map(v=>`<label data-n="${esc(norm(k==='_status'?ST[v]:v))}"><input type="checkbox" value="${esc(v)}" ${a.includes(String(v))?'checked':''}>${esc(k==='_status'?ST[v]:v)}</label>`).join('')}</div><div class="acts"><button type="button" class="btn sm" data-a="clr">Limpar</button><button type="button" class="btn sm primary" data-a="ok">Aplicar</button></div></div></div></div>`; }).join('')
+  $('#filters').innerHTML = FILTERS.map(([k,l])=>{ const a=Object.prototype.hasOwnProperty.call(state.f,k)?sel(k):uniqFor(k).map(String); const lab=a.length?(a.length===1?(k==='_status'?ST[a[0]]:a[0]):a.length+' selecionados'):(Object.prototype.hasOwnProperty.call(state.f,k)?'Nenhum':'Todos');
+    return `<div><label>${l}</label><div class="ms" data-k="${k}"><button type="button">${esc(lab)} ▾</button><div class="pop"><input type="search" placeholder="Buscar…"><label class="all-options"><input type="checkbox" data-all aria-label="Marcar/desmarcar todas as opções de ${l}">Marcar/desmarcar todas</label><div class="opts">${uniqFor(k).map(v=>`<label data-n="${esc(norm(k==='_status'?ST[v]:v))}"><input type="checkbox" value="${esc(v)}" ${a.includes(String(v))?'checked':''}>${esc(k==='_status'?ST[v]:v)}</label>`).join('')}</div><div class="acts"><button type="button" class="btn sm" data-a="clr">Limpar</button><button type="button" class="btn sm primary" data-a="ok">Aplicar</button></div></div></div></div>`; }).join('')
    + `<div><label>Próx. preventiva de</label><input type="date" data-k="_de" value="${state.f._de||''}"></div><div><label>até</label><input type="date" data-k="_ate" value="${state.f._ate||''}"></div>`;
   $('#filters').querySelectorAll('input[type=date]').forEach(el=>el.onchange=()=>{ state.f[el.dataset.k]=el.value; render(); });
   $('#filters').querySelectorAll('.ms').forEach(m=>{ const k=m.dataset.k;
     m.querySelector(':scope>button').onclick=()=>{ const o=m.classList.contains('open'); document.querySelectorAll('.ms.open').forEach(x=>x!==m&&x.classList.remove('open')); m.classList.toggle('open',!o); if(!o) m.querySelector('input[type=search]').focus(); };
     m.querySelector('input[type=search]').oninput=e=>{ const t=norm(e.target.value); m.querySelectorAll('.opts label').forEach(l=>l.style.display=l.dataset.n.includes(t)?'':'none'); };
-    m.querySelectorAll('.opts input').forEach(c=>c.onchange=()=>{ const a=sel(k); state.f[k]=c.checked?[...a,c.value]:a.filter(x=>x!==c.value); m._dirty=true; if(k==='CLIENTE'){ const u=uniq('UNIDADE'); } render(); });
-    m.querySelector('[data-a=clr]').onclick=()=>{ state.f[k]=[]; if(k==='CLIENTE') state.f.UNIDADE=[]; buildFilters(); render(); };
+    const all=m.querySelector('[data-all]'), options=[...m.querySelectorAll('.opts input')];
+    const syncAll=()=>{ const n=options.filter(c=>c.checked).length; all.checked=options.length>0&&n===options.length; all.indeterminate=n>0&&n<options.length; all.disabled=!options.length; };
+    const updateSelection=()=>{ state.f[k]=options.filter(c=>c.checked).map(c=>c.value); m._dirty=true; syncAll(); render(); };
+    all.onchange=()=>{ options.forEach(c=>c.checked=all.checked); updateSelection(); };
+    options.forEach(c=>c.onchange=updateSelection); syncAll();
+    m.querySelector('[data-a=clr]').onclick=()=>{ delete state.f[k]; if(k==='CLIENTE') delete state.f.UNIDADE; buildFilters(); render(); };
     m.querySelector('[data-a=ok]').onclick=()=>{ m.classList.remove('open'); if(k==='CLIENTE'){ const ok=uniqFor('UNIDADE'); state.f.UNIDADE=sel('UNIDADE').filter(u=>ok.map(String).includes(u)); } buildFilters(); render(); };
   });
 }
@@ -299,7 +305,8 @@ function filtered(){
   const {terms,fields}=parseQuery(state.q);
   return rows.filter(r=>{
     for(const [k,v] of Object.entries(state.f)){
-      if(!v||(Array.isArray(v)&&!v.length)) continue;
+      if(FK.includes(k)&&Array.isArray(v)&&!v.length) return false;
+      if(!v) continue;
       if(FK.includes(k)){ const a=sel(k); if(!a.includes(String(k==='_status'?status(r):r[k]))) return false; continue; }
       if(k==='_de'){ if(!(r['PROX.']>=v)) return false; continue; }
       if(k==='_ate'){ if(!(r['PROX.'] && r['PROX.']<=v)) return false; continue; }
@@ -317,9 +324,9 @@ function filtered(){
 function chips(){
   const c=[];
   if(state.q) c.push(['q',`Busca: “${state.q}”`]);
-  for(const [k,v] of Object.entries(state.f)){ if(FK.includes(k)){ sel(k).forEach(x=>c.push([k,`${FILTERS.find(f=>f[0]===k)[1]}: ${k==='_status'?ST[x]:x}`,x])); } else if(v) c.push([k,`${k==='_de'?'De':'Até'}: ${br(v)}`]); }
+  for(const [k,v] of Object.entries(state.f)){ if(FK.includes(k)){ if(!sel(k).length)c.push([k,`${FILTERS.find(f=>f[0]===k)[1]}: Nenhum`]); sel(k).forEach(x=>c.push([k,`${FILTERS.find(f=>f[0]===k)[1]}: ${k==='_status'?ST[x]:x}`,x])); } else if(v) c.push([k,`${k==='_de'?'De':'Até'}: ${br(v)}`]); }
   $('#chips').innerHTML = c.map(([k,l,x])=>`<span class="chip" data-k="${k}" data-v="${esc(x??'')}">${esc(l)} ✕</span>`).join('') + (c.length?`<span class="chip" data-k="*">Limpar tudo</span>`:'');
-  $('#chips').querySelectorAll('.chip').forEach(el=>el.onclick=()=>{ const k=el.dataset.k; if(k==='*'){state.f={};state.q='';} else if(k==='q') state.q=''; else if(FK.includes(k)) state.f[k]=sel(k).filter(x=>x!==el.dataset.v); else state.f[k]=''; $('#q').value=state.q; buildFilters(); render(); });
+  $('#chips').querySelectorAll('.chip').forEach(el=>el.onclick=()=>{ const k=el.dataset.k; if(k==='*'){state.f={};state.q='';} else if(k==='q') state.q=''; else if(FK.includes(k)){ if(!sel(k).length) delete state.f[k]; else state.f[k]=sel(k).filter(x=>x!==el.dataset.v); } else state.f[k]=''; $('#q').value=state.q; buildFilters(); render(); });
 }
 
 /* Sugestões da busca */
@@ -417,14 +424,15 @@ function openForm(r){
   const one=k=>sel(k).length===1?sel(k)[0]:''; const base = r || {CLIENTE:one('CLIENTE'),UNIDADE:one('UNIDADE'),REGIÃO:one('REGIÃO')};
   $('#fBody').innerHTML = FORM_COLS.map(c=>`<div class="field"><label>${c}</label><input name="${c}" ${DATE_COLS.includes(c)?'type="date"':''} list="dl-${norm(c).replace(/\W/g,'')}" value="${esc(base[c]??'')}" ${['CLIENTE','UNIDADE','EQUIPAMENTO'].includes(c)?'required':''}></div>`).join('')
     + ["CLIENTE","UNIDADE","CATEGORIA","RESPONSAVÉL","REGIÃO","EQUIPAMENTO"].map(c=>`<datalist id="dl-${norm(c).replace(/\W/g,'')}">${uniq(c).map(v=>`<option value="${esc(v)}">`).join('')}</datalist>`).join('');
+  $('#fTransferSearch').replaceChildren();
   const uIn=$('#fBody [name="UNIDADE"]'); uIn.removeAttribute('list'); uIn.autocomplete='off'; uIn.placeholder='Busque a unidade de destino…';
   uIn.removeAttribute('required'); uIn.dataset.orig=String(base.UNIDADE??''); uIn.dataset.touched='0'; uIn.value='';
-  const wrap=uIn.parentElement; wrap.classList.add('ac'); wrap.querySelector('label').textContent='UNIDADE (transferência – busca inteligente)';
+  const oldWrap=uIn.parentElement; const wrap=$('#fTransferSearch'); wrap.appendChild(oldWrap.querySelector('label')); wrap.appendChild(uIn); oldWrap.remove(); uIn.setAttribute('form','form'); wrap.classList.add('ac'); wrap.querySelector('label').textContent='UNIDADE (transferência – busca inteligente)';
   const usg=document.createElement('div'); usg.className='suggest'; wrap.appendChild(usg);
   const units=()=>{ const m={}; rows.forEach(x=>{ if(x.UNIDADE!==''&&x.UNIDADE!=null){ const key=x.UNIDADE+'|'+x.CLIENTE; m[key]??={u:x.UNIDADE,c:x.CLIENTE,cnpj:x.CNPJ,reg:x['REGIÃO']}; } }); return Object.values(m); };
   const showU=()=>{ const t=norm(uIn.value).split(/\s+/).filter(Boolean); const L=units().filter(o=>t.every(w=>norm(o.u+' '+o.c+' '+o.reg).includes(w))).slice(0,12);
     usg.innerHTML=L.map((o,i)=>`<div data-i="${i}"><span>${esc(o.u)}</span><small>${esc(o.c)}</small></div>`).join(''); usg.style.display=L.length?'block':'none';
-    [...usg.children].forEach(d=>d.onmousedown=ev=>{ ev.preventDefault(); const o=L[+d.dataset.i]; uIn.value=o.u; const F=n=>$(`#fBody [name="${n}"]`);
+    [...usg.children].forEach(d=>d.onmousedown=ev=>{ ev.preventDefault(); const o=L[+d.dataset.i]; uIn.value=o.u; uIn.dataset.touched='1'; const F=n=>$(`#fBody [name="${n}"]`);
       F('CLIENTE').value=o.c; if(o.cnpj) F('CNPJ').value=o.cnpj; if(o.reg) F('REGIÃO').value=o.reg; usg.style.display='none'; toast(`Unidade ${o.u} → cliente ${o.c}`); }); };
   uIn.addEventListener('input',()=>uIn.dataset.touched='1'); uIn.addEventListener('input',showU); uIn.addEventListener('focus',showU); uIn.addEventListener('blur',()=>setTimeout(()=>usg.style.display='none',150));
   const prev=$('#fBody [name="PREV. ATUAL"]'), prox=$('#fBody [name="PROX."]');
@@ -433,7 +441,7 @@ function openForm(r){
 }
 async function saveForm(e){
   e.preventDefault(); const rec={...(current||{})}; new FormData($('#form')).forEach((v,k)=>rec[k]=String(v).trim());
-  { const u=$('#fBody [name="UNIDADE"]'); if(u&&u.dataset.touched!=='1') rec.UNIDADE=u.dataset.orig||''; }
+  { const u=$('#form [name="UNIDADE"], #fTransferSearch [name="UNIDADE"]'); if(u&&u.dataset.touched!=='1') rec.UNIDADE=u.dataset.orig||''; }
   if(rec.SERIAL && rows.some(r=>r.ID!==rec.ID && String(r.SERIAL)===rec.SERIAL) && !confirm('Já existe um equipamento com este serial. Salvar mesmo assim?')) return;
   busy(true);
   try{ await api('POST',{action:current?'update':'create',record:rec}); closeM('mForm'); toast(current?'Registro atualizado':'Registro criado'); await reload(); }
