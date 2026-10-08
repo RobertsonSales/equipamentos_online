@@ -219,6 +219,7 @@ button,input,select,textarea{touch-action:manipulation}button:focus-visible,inpu
   </div>
   <div class="spacer"></div>
   <button class="btn theme-toggle" type="button" onclick="toggleTheme()" aria-label="Alternar modo claro e escuro" title="Alternar modo claro e escuro"><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.5A9 9 0 0 1 9.5 3.5a9 9 0 1 0 11 11Z"/></svg></button>
+  <button class="btn" type="button" onclick="openTutorial()" title="Abrir tutorial do operador">▤ Tutorial</button>
   <button class="btn" onclick="reload()">↻ Atualizar</button>
   <button class="btn" onclick="openPdf()">⎙ Relatório PDF</button>
   <button class="btn primary" onclick="openForm()">＋ Novo equipamento</button>
@@ -808,6 +809,7 @@ function buildPdf(){
 }
 function openPdf(){ busy(true); setTimeout(()=>{ pdfDoc=buildPdf(); $('#pdfFrame').src=pdfDoc.output('bloburl'); $('#mPdf').classList.add('open'); busy(false); },30); }
 function downloadPdf(){ pdfDoc && pdfDoc.save(`patrimonio_${new Date().toISOString().slice(0,10)}.pdf`); }
+function openTutorial(){ window.open('Tutorial_Operador_Inventario_Equipamentos.html','_blank','noopener,noreferrer'); }
 
 $('#chipsbox').open=false;
 reload();
