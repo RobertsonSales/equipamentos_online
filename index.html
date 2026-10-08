@@ -302,6 +302,9 @@ const norm = s => String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').
 const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const today = (()=>{const d=new Date();d.setHours(0,0,0,0);return d})();
 const pd = s => { if(!s) return null; const m=String(s).match(/^(\d{4})-(\d{2})-(\d{2})/); return m? new Date(+m[1],m[2]-1,+m[3]) : null; };
+// Regra da planilha: a próxima preventiva ocorre 180 dias após a preventiva atual.
+const PREVENTIVE_INTERVAL_DAYS = 180;
+const nextPreventiveDate = value => { const d=pd(value); if(!d) return ''; d.setDate(d.getDate()+PREVENTIVE_INTERVAL_DAYS); return d.toISOString().slice(0,10); };
 const br = s => { const d=pd(s); return d? d.toLocaleDateString('pt-BR') : '—'; };
 const days = s => { const d=pd(s); return d? Math.round((d-today)/864e5) : null; };
 function status(r){ const n=days(r['PROX.']); if(n===null) return 'sem'; if(n<0) return 'vencida'; if(n<=30) return 'proxima'; return 'emdia'; }
@@ -592,7 +595,9 @@ function openForm(r){
       F('CLIENTE').value=o.c; if(o.cnpj) F('CNPJ').value=o.cnpj; if(o.reg) F('REGIÃO').value=o.reg; usg.style.display='none'; toast(`Unidade ${o.u} → cliente ${o.c}`); }); };
   uIn.addEventListener('input',()=>uIn.dataset.touched='1'); uIn.addEventListener('input',showU); uIn.addEventListener('focus',showU); uIn.addEventListener('blur',()=>setTimeout(()=>usg.style.display='none',150));
   const prev=$('#fBody [name="PREV. ATUAL"]'), prox=$('#fBody [name="PROX."]');
-  prev.addEventListener('change',()=>{ if(prev.value && !prox.value){ const d=pd(prev.value); d.setDate(d.getDate()+180); prox.value=d.toISOString().slice(0,10); toast('Próxima preventiva sugerida: +180 dias'); }});
+  prox.readOnly=true; prox.title='Calculada automaticamente: preventiva atual + 180 dias';
+  const syncNextPreventive=()=>{ const next=nextPreventiveDate(prev.value); const changed=prox.value!==next; prox.value=next; if(changed&&prev.value) toast('Próxima preventiva calculada automaticamente: +180 dias'); };
+  prev.addEventListener('input',syncNextPreventive); prev.addEventListener('change',syncNextPreventive);
   $('#mForm').classList.add('open');
 }
 async function saveForm(e){
