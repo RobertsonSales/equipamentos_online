@@ -151,7 +151,22 @@ header{background:var(--header)}
 main,header>* ,.grid>* ,.filters>* ,.field,.tree,.eq,.modal .box{min-width:0}
 .chart-area{height:270px;position:relative;min-width:0}.chart-area canvas{max-width:100%}
 .agenda-grid{grid-template-columns:2fr 1fr}
-.suggest{z-index:35}.suggest div>span,.suggest small{min-width:0;overflow-wrap:anywhere}
+.preventive-panel{margin-top:14px}
+.preventive-summary{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:10px;margin-bottom:14px}
+.preventive-stat{border:1px solid var(--line);border-radius:11px;padding:11px 13px;background:var(--panel2);min-width:0}
+.preventive-stat .l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.preventive-stat .v{font-size:24px;font-weight:800;margin-top:3px}
+.preventive-layout{display:grid;grid-template-columns:1.25fr 1fr;gap:14px}
+.preventive-subtitle{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin:0 0 7px}
+.preventive-table{margin-top:0;font-size:12px}
+.preventive-table th,.preventive-table td{padding:8px 9px}
+.preventive-table th{position:static}
+.preventive-table td:not(:first-child),.preventive-table th:not(:first-child){text-align:center}
+.preventive-table .danger{color:var(--expired-text);font-weight:700}
+.preventive-table .muted{color:var(--muted)}
+.preventive-scroll{max-height:310px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+ .suggest{z-index:35}.suggest div>span,.suggest small{min-width:0;overflow-wrap:anywhere}
+ @media(max-width:720px){.preventive-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.preventive-layout{grid-template-columns:minmax(0,1fr)}}
 .tablewrap{max-width:100%;overscroll-behavior-x:contain}
 button,input,select,textarea{touch-action:manipulation}button:focus-visible,input:focus-visible{outline:2px solid var(--brand);outline-offset:3px}
 .modal .hd{display:grid;grid-template-columns:minmax(0,1fr) auto}.modal .hd h3{min-width:0;margin:0;overflow-wrap:anywhere}.modal .hd .spacer{display:none}
@@ -224,7 +239,14 @@ button,input,select,textarea{touch-action:manipulation}button:focus-visible,inpu
     <div class="card"><h3>Agenda de preventivas <small>· próximos 12 meses</small></h3><div class="chart-area"><canvas id="chAgenda" height="110"></canvas></div></div>
     <div class="card"><h3>Carga por responsável</h3><div class="chart-area"><canvas id="chResp" height="220"></canvas></div></div>
   </section>
-
+  <section class="card preventive-panel">
+    <h3>Preventivas por unidade de saúde <small>· cenário filtrado</small></h3>
+    <div class="preventive-summary" id="preventiveSummary"></div>
+    <div class="preventive-layout">
+      <div><p class="preventive-subtitle">Resumo por unidade e quantidade de equipamentos</p><div class="preventive-scroll"><table class="preventive-table" id="preventiveUnits"></table></div></div>
+      <div><p class="preventive-subtitle">Linha de ação / categoria</p><div class="preventive-scroll"><table class="preventive-table" id="preventiveCategories"></table></div><p class="preventive-subtitle" style="margin-top:14px">Ranking por atraso</p><div class="preventive-scroll"><table class="preventive-table" id="preventiveRanking"></table></div></div>
+    </div>
+  </section>
   <div class="section-title"><h2>Clientes › Unidades › Equipamentos</h2><span class="badge" id="treeCount"></span></div>
   <div class="tree" id="tree"></div>
 
@@ -465,7 +487,23 @@ function suggest(){
 /* ======================= RENDER ======================= */
 function render(){
   const data = filtered(); chips();
-  renderKpis(data); renderInsights(data); renderCharts(data); renderTree(data); renderTable(data);
+  renderKpis(data); renderInsights(data); renderCharts(data); renderPreventivePanel(data); renderTree(data); renderTable(data);
+}
+function preventiveAnalysis(d){
+  const keys=['vencida','proxima','emdia','sem'];
+  const count=list=>keys.reduce((o,k)=>(o[k]=list.filter(r=>status(r)===k).length,o),{});
+  const units={}; d.forEach(r=>{const key=`${r.CLIENTE||'—'}|${r.UNIDADE||'—'}`; (units[key]??={cliente:r.CLIENTE||'—',unidade:r.UNIDADE||'—',items:[]}).items.push(r);});
+  const categories={}; d.forEach(r=>{const key=r.CATEGORIA||'—'; (categories[key]??=[]).push(r);});
+  const ranking=d.filter(r=>status(r)==='vencida').sort((a,b)=>(days(a['PROX.'])??0)-(days(b['PROX.'])??0));
+  return {total:count(d),units:Object.values(units).map(x=>({...x,counts:count(x.items)})).sort((a,b)=>b.items.length-a.items.length),categories:Object.entries(categories).map(([name,items])=>({name,counts:count(items)})).sort((a,b)=>b.counts.vencida-a.counts.vencida||b.counts.proxima-a.counts.proxima||a.name.localeCompare(b.name,'pt')),ranking};
+}
+function renderPreventivePanel(d){
+  const a=preventiveAnalysis(d), t=a.total;
+  const stats=[['Atrasadas',t.vencida,'var(--bad)'],['Em dia',t.emdia,'var(--ok)'],['Vencem em até 30 dias',t.proxima,'var(--warn)'],['Sem preventiva',t.sem,'var(--muted)']];
+  $('#preventiveSummary').innerHTML=stats.map(([l,v,c])=>`<div class="preventive-stat" style="border-left:3px solid ${c}"><div class="l">${l}</div><div class="v">${v}</div><div class="s" style="color:var(--muted);font-size:11px">equipamento(s)</div></div>`).join('');
+  $('#preventiveUnits').innerHTML=`<thead><tr><th>Unidade</th><th>Equip.</th><th>Atras.</th><th>Em dia</th><th>Sem prev.</th></tr></thead><tbody>${a.units.map(x=>`<tr><td style="text-align:left"><b>${esc(x.unidade)}</b><br><small class="muted">${esc(x.cliente)}</small></td><td>${x.items.length}</td><td class="danger">${x.counts.vencida}</td><td>${x.counts.emdia+x.counts.proxima}</td><td class="muted">${x.counts.sem}</td></tr>`).join('')||'<tr><td colspan="5">Nenhum registro no cenário atual.</td></tr>'}</tbody>`;
+  $('#preventiveCategories').innerHTML=`<thead><tr><th>Categoria</th><th>Equip.</th><th>Atras.</th><th>Em dia</th><th>Sem</th></tr></thead><tbody>${a.categories.map(x=>`<tr><td style="text-align:left">${esc(x.name)}</td><td>${x.counts.vencida+x.counts.proxima+x.counts.emdia+x.counts.sem}</td><td class="danger">${x.counts.vencida}</td><td>${x.counts.emdia+x.counts.proxima}</td><td class="muted">${x.counts.sem}</td></tr>`).join('')||'<tr><td colspan="5">Nenhum registro.</td></tr>'}</tbody>`;
+  $('#preventiveRanking').innerHTML=`<thead><tr><th># Equipamento</th><th>Unidade</th><th>Atraso</th></tr></thead><tbody>${a.ranking.slice(0,10).map((r,i)=>`<tr><td style="text-align:left"><b>${i+1}. ${esc(r.EQUIPAMENTO)}</b><br><small class="muted">${esc(r.CATEGORIA||'—')}</small></td><td>${esc(r.UNIDADE||'—')}</td><td class="danger">${-days(r['PROX.'])} d</td></tr>`).join('')||'<tr><td colspan="3">Nenhum atraso registrado.</td></tr>'}</tbody>`;
 }
 function renderKpis(d){
   const c={vencida:0,proxima:0,emdia:0,sem:0}; d.forEach(r=>c[status(r)]++);
@@ -652,7 +690,21 @@ async function exportXlsx(){
   if(y>first){ const t=r1.getRow(y); t.getCell(1).value='TOTAL'; ['B','C','D','E','F','G'].forEach((L,i)=>t.getCell(i+2).value={formula:`SUM(${L}${first}:${L}${y-1})`});
     t.eachCell(x=>{x.font={...F,bold:true};x.border={...box,top:{style:'medium',color:{argb:INK}}};x.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE2E8F0'}}; }); for(let n=2;n<=7;n++) t.getCell(n).alignment={horizontal:'center'}; }
 
-  /* --- Aba 2: Registros --- */
+  /* --- Aba 2: Preventivas --- */
+  const pa=preventiveAnalysis(d);
+  const pr=wb.addWorksheet('Preventivas',{views:[{showGridLines:false}],pageSetup:{orientation:'landscape',paperSize:9,fitToPage:true,fitToWidth:1,fitToHeight:0}});
+  pr.columns=[{width:34},{width:18},{width:16},{width:16},{width:16},{width:16}]; title(pr,'Preventivas por unidade de saúde',6);
+  let py=4; const psec=t=>{const c=pr.getCell(py,1);c.value=t;c.font={name:'Arial',size:11,bold:true,color:{argb:INK}};pr.getRow(py).height=20;py++;};
+  psec('Volume de preventivas'); const ph=pr.getRow(py); ph.values=['Status','Equipamentos','Percentual']; head(ph); py++;
+  [['Atrasadas','vencida'],['Vencem em até 30 dias','proxima'],['Em dia (>30 dias)','emdia'],['Sem preventiva','sem']].forEach(([label,k],i)=>{const row=pr.getRow(py++);row.values=[label,pa.total[k],pa.total[k]/(d.length||1)];row.getCell(3).numFmt='0.0%';row.eachCell({includeEmpty:true},x=>{x.font=F;x.border=box;if(i%2)x.fill={type:'pattern',pattern:'solid',fgColor:{argb:ZEBRA}};});});
+  py+=1;psec('Resumo por unidade de saúde'); let uh=pr.getRow(py);uh.values=['Cliente','Unidade','Equipamentos','Atrasadas','Em dia / 30d','Sem preventiva'];head(uh);py++;
+  pa.units.forEach((x,i)=>{const row=pr.getRow(py++);row.values=[x.cliente,x.unidade,x.items.length,x.counts.vencida,x.counts.emdia+x.counts.proxima,x.counts.sem];row.eachCell({includeEmpty:true},(c,n)=>{c.font=F;c.border=box;if(i%2)c.fill={type:'pattern',pattern:'solid',fgColor:{argb:ZEBRA}};if(n>2)c.alignment={horizontal:'center'};});});
+  py+=1;psec('Linha de ação / categoria'); let ch2=pr.getRow(py);ch2.values=['Categoria','Equipamentos','Atrasadas','Em dia / 30d','Sem preventiva'];head(ch2);py++;
+  pa.categories.forEach((x,i)=>{const row=pr.getRow(py++);row.values=[x.name,x.counts.vencida+x.counts.proxima+x.counts.emdia+x.counts.sem,x.counts.vencida,x.counts.emdia+x.counts.proxima,x.counts.sem];row.eachCell({includeEmpty:true},(c,n)=>{c.font=F;c.border=box;if(i%2)c.fill={type:'pattern',pattern:'solid',fgColor:{argb:ZEBRA}};if(n>1)c.alignment={horizontal:'center'};});});
+  py+=1;psec('Ranking por atraso'); let rh=pr.getRow(py);rh.values=['Posição','Equipamento','Cliente','Unidade','Categoria','Dias de atraso'];head(rh);py++;
+  pa.ranking.forEach((r,i)=>{const row=pr.getRow(py++);row.values=[i+1,r.EQUIPAMENTO,r.CLIENTE,r.UNIDADE,r.CATEGORIA,-days(r['PROX.'])];row.eachCell({includeEmpty:true},(c,n)=>{c.font=n===6?{...F,bold:true,color:{argb:STC.vencida[1]}}:F;c.border=box;if(i%2)c.fill={type:'pattern',pattern:'solid',fgColor:{argb:ZEBRA}};});});
+
+  /* --- Aba 3: Registros --- */
   const ws=wb.addWorksheet('Registros',{views:[{state:'frozen',ySplit:4,xSplit:2,showGridLines:false}],pageSetup:{orientation:'landscape',paperSize:9,fitToPage:true,fitToWidth:1,fitToHeight:0,printTitlesRow:'4:4'}});
   const XC=["CLIENTE","CNPJ","UNIDADE","REGIÃO","CATEGORIA","EQUIPAMENTO","SERIAL","CD PAT","SETOR","TEC","RESPONSAVÉL","INSTALAÇÃO","PREV. ATUAL","PROX.","_dias","_status","LOCAÇÃO R$","TROCA DE LÂMP","TROCA DE PROB","TROCA REFER","TROCA DA LS","OBS"];
   const LBL={_dias:'DIAS P/ PRÓX.',_status:'STATUS',"RESPONSAVÉL":'RESPONSÁVEL'};
@@ -721,8 +773,21 @@ function buildPdf(){
   // Insights
   y+=28; doc.setTextColor(...C.ink); doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text('Destaques',14,y); doc.setFont('helvetica','normal'); doc.setFontSize(8.8); doc.setTextColor(51,65,85);
   insightsList(d).slice(0,6).forEach(t=>{ y+=5.2; doc.text('•  '+t.replace(/<[^>]+>/g,''),16,y,{maxWidth:W-32}); });
+  // Quadro de preventivas por unidade, categoria e atraso
+  const pa=preventiveAnalysis(d);
+  y+=8; doc.setTextColor(...C.ink); doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text('Preventivas por unidade de saúde',14,y);
+  y+=5; doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...C.muted); doc.text(`Atrasadas: ${pa.total.vencida}  ·  Vencem em até 30 dias: ${pa.total.proxima}  ·  Em dia: ${pa.total.emdia}  ·  Sem preventiva: ${pa.total.sem}`,14,y);
+  const unitRows=pa.units.map(x=>[x.cliente,x.unidade,x.items.length,x.counts.vencida,x.counts.emdia+x.counts.proxima,x.counts.sem]);
+  doc.autoTable({startY:y+4,head:[['Cliente','Unidade','Equip.','Atrasadas','Em dia / 30d','Sem prev.']],body:unitRows,theme:'grid',headStyles:{fillColor:C.ink,fontSize:8},styles:{fontSize:7.7,cellPadding:1.8,lineColor:C.line},columnStyles:{2:{halign:'center'},3:{halign:'center',textColor:[185,28,28]},4:{halign:'center'},5:{halign:'center'}},margin:{left:14,right:14}});
+  y=doc.lastAutoTable.finalY+7; if(y>H-55){doc.addPage();y=20;}
+  const catRows=pa.categories.map(x=>[x.name,x.counts.vencida+x.counts.proxima+x.counts.emdia+x.counts.sem,x.counts.vencida,x.counts.emdia+x.counts.proxima,x.counts.sem]);
+  doc.setTextColor(...C.ink);doc.setFont('helvetica','bold');doc.setFontSize(9.5);doc.text('Linha de ação / categoria',14,y);
+  doc.autoTable({startY:y+3,head:[['Categoria','Equip.','Atrasadas','Em dia / 30d','Sem prev.']],body:catRows,theme:'striped',headStyles:{fillColor:[30,41,59],fontSize:7.8},styles:{fontSize:7.7,cellPadding:1.6},alternateRowStyles:{fillColor:[248,250,252]},columnStyles:{1:{halign:'center'},2:{halign:'center',textColor:[185,28,28]},3:{halign:'center'},4:{halign:'center'}},margin:{left:14,right:14}});
+  y=doc.lastAutoTable.finalY+7; if(y>H-45){doc.addPage();y=20;}
+  doc.setTextColor(...C.ink);doc.setFont('helvetica','bold');doc.setFontSize(9.5);doc.text('Ranking por atraso',14,y);
+  doc.autoTable({startY:y+3,head:[['#','Equipamento','Unidade','Categoria','Dias de atraso']],body:pa.ranking.slice(0,15).map((r,i)=>[i+1,r.EQUIPAMENTO,r.UNIDADE,r.CATEGORIA,-days(r['PROX.'])]),theme:'grid',headStyles:{fillColor:[30,41,59],fontSize:7.8},styles:{fontSize:7.7,cellPadding:1.6,lineColor:C.line},columnStyles:{0:{halign:'center'},4:{halign:'center',textColor:[185,28,28]}},margin:{left:14,right:14}});
   // Resumo por cliente/unidade
-  y+=8; const g=group(d); const sumRows=[];
+  y=doc.lastAutoTable.finalY+8; const g=group(d); const sumRows=[];
   Object.entries(g).forEach(([cli,o])=>Object.entries(o.u).forEach(([u,l])=>{ const s={vencida:0,proxima:0,emdia:0,sem:0}; l.forEach(r=>s[status(r)]++); sumRows.push([cli,[...o.cnpj].filter(Boolean).join(', '),u,l.length,s.emdia,s.proxima,s.vencida,s.sem]); }));
   doc.autoTable({startY:y,head:[['Cliente','CNPJ','Unidade','Equip.','Em dia','30 dias','Vencidas','Sem data']],body:sumRows,theme:'grid',
     headStyles:{fillColor:C.ink,fontSize:8},styles:{fontSize:8,cellPadding:2,lineColor:C.line},columnStyles:{3:{halign:'center'},4:{halign:'center'},5:{halign:'center'},6:{halign:'center',textColor:[185,28,28]},7:{halign:'center'}},margin:{left:14,right:14}});
