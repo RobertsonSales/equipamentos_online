@@ -35,6 +35,7 @@ header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:16px
 .btn:hover{border-color:var(--brand);transform:translateY(-1px)}
 .btn.primary{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#04131a;border:0}
 .btn.danger{color:var(--bad)}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
 .btn.sm{padding:6px 9px;font-size:12px}
 main{padding:24px 28px 60px;max-width:1500px;margin:0 auto}
 .search{position:relative;flex:1;min-width:320px;max-width:560px}
@@ -48,7 +49,7 @@ main{padding:24px 28px 60px;max-width:1500px;margin:0 auto}
 .filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:18px 0}
 .filters select,.filters input{width:100%;padding:9px 11px;border-radius:10px;border:1px solid var(--line);background:var(--panel)}
 .filters label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);display:block;margin-bottom:5px}
-.chips{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px 12px}.chipsbox{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:14px}.chipsbox summary{cursor:pointer;padding:10px 12px;font-size:13px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:8px;user-select:none}.chipsbox summary::marker{color:var(--brand)}.chipsbox:not([open]) .chips{display:none}
+.chips{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px 12px}.chipsbox{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:14px}.chipsbox summary{cursor:pointer;flex-wrap:wrap;padding:10px 12px;font-size:13px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:8px;user-select:none}.chipsbox summary::marker{color:var(--brand)}.chipsbox:not([open]) .chips{display:none}
 .chip{font-size:12px;background:#14b8a61a;border:1px solid #14b8a655;color:#5eead4;padding:4px 10px;border-radius:99px;cursor:pointer}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
 .kpi{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;position:relative;overflow:hidden;cursor:pointer;transition:.15s}
@@ -210,7 +211,7 @@ button,input,select,textarea{touch-action:manipulation}button:focus-visible,inpu
 
 <main>
   <div class="filters" id="filters"></div>
-  <details class="chipsbox" id="chipsbox" data-collapsed-on-load><summary>Filtros aplicados <span id="chipsCount" class="badge">0</span></summary><div class="chips" id="chips"></div></details>
+  <details class="chipsbox" id="chipsbox" data-collapsed-on-load><summary>Filtros aplicados <span id="chipsCount" class="badge">0</span><span class="spacer"></span><button type="button" class="btn sm danger" id="clearAll" title="Remover todos os filtros e a busca">✕ Limpar todos os filtros</button></summary><div class="chips" id="chips"></div></details>
 
   <section class="kpis" id="kpis"></section>
 
@@ -417,12 +418,19 @@ function filtered(){
     return terms.every(t=>hay.includes(t));
   });
 }
+function clearAllFilters(){
+  state.f={}; state.q=''; $('#q').value=''; $('#suggest').style.display='none';
+  document.querySelectorAll('.ms.open').forEach(m=>{ m.classList.remove('open'); resetPop(m); });
+  buildFilters(); render();
+  document.querySelectorAll('.ms[data-k="CLIENTE"]>button, .ms[data-k="UNIDADE"]>button').forEach(b=>b.textContent='Todos ▾');
+}
+$('#clearAll').addEventListener('click',e=>{ e.preventDefault(); e.stopPropagation(); clearAllFilters(); toast('Todos os filtros foram removidos'); });
 function chips(){
   const c=[];
   if(state.q) c.push(['q',`Busca: “${state.q}”`]);
   for(const [k,v] of Object.entries(state.f)){ if(FK.includes(k)){ if(!sel(k).length)c.push([k,`${FILTERS.find(f=>f[0]===k)[1]}: Nenhum`]); sel(k).forEach(x=>c.push([k,`${FILTERS.find(f=>f[0]===k)[1]}: ${k==='_status'?ST[x]:x}`,x])); } else if(v) c.push([k,`${k==='_de'?'De':'Até'}: ${br(v)}`]); }
-  $('#chips').innerHTML = c.map(([k,l,x])=>`<span class="chip" data-k="${k}" data-v="${esc(x??'')}">${esc(l)} ✕</span>`).join('') + (c.length?`<span class="chip" data-k="*">Limpar tudo</span>`:''); $('#chipsCount').textContent=c.length; $('#chips').innerHTML||($('#chips').innerHTML='<span class="muted" style="font-size:12px;color:var(--muted)">Nenhum filtro marcado</span>');
-  $('#chips').querySelectorAll('.chip').forEach(el=>el.onclick=()=>{ const k=el.dataset.k; if(k==='*'){state.f={};state.q='';} else if(k==='q') state.q=''; else if(FK.includes(k)){ if(!sel(k).length) delete state.f[k]; else state.f[k]=sel(k).filter(x=>x!==el.dataset.v);
+  $('#chips').innerHTML = c.map(([k,l,x])=>`<span class="chip" data-k="${k}" data-v="${esc(x??'')}">${esc(l)} ✕</span>`).join('') + (c.length?`<span class="chip" data-k="*">Limpar tudo</span>`:''); $('#chipsCount').textContent=c.length; $('#clearAll').disabled=!c.length; $('#chips').innerHTML||($('#chips').innerHTML='<span class="muted" style="font-size:12px;color:var(--muted)">Nenhum filtro marcado</span>');
+  $('#chips').querySelectorAll('.chip').forEach(el=>el.onclick=()=>{ const k=el.dataset.k; if(k==='*'){ clearAllFilters(); return; } else if(k==='q') state.q=''; else if(FK.includes(k)){ if(!sel(k).length) delete state.f[k]; else state.f[k]=sel(k).filter(x=>x!==el.dataset.v);
       const hasU=Object.prototype.hasOwnProperty.call(state.f,'UNIDADE'), hasC=Object.prototype.hasOwnProperty.call(state.f,'CLIENTE');
       if(k==='CLIENTE'&&hasU){ const rm=clientUnits(el.dataset.v); state.f.UNIDADE=sel('UNIDADE').filter(u=>!rm.includes(u)); if(!sel('CLIENTE').length){ delete state.f.CLIENTE; delete state.f.UNIDADE; } }
       if(k==='UNIDADE'&&Array.isArray(state.f.UNIDADE)){ const U=sel('UNIDADE'); if(hasC){ const C=sel('CLIENTE').filter(c=>clientUnits(c).some(u=>U.includes(u))); if(C.length) state.f.CLIENTE=C; else { delete state.f.CLIENTE; delete state.f.UNIDADE; } } else if(!U.length) delete state.f.UNIDADE; } } else state.f[k]=''; $('#q').value=state.q; buildFilters(); render(); });
@@ -523,10 +531,9 @@ function sorted(d){ const {k,d:dir}=state.sort; return [...d].sort((a,b)=>String
 function renderTable(d){
   $('#rowCount').textContent=`${d.length} de ${rows.length}`;
   $('#table').innerHTML = `<thead><tr>${TABLE_COLS.map(c=>`<th data-k="${c}">${c}${state.sort.k===c?(state.sort.d>0?' ↑':' ↓'):''}</th>`).join('')}<th>Status</th><th></th></tr></thead><tbody>
-  ${sorted(d).map(r=>`<tr>${TABLE_COLS.map(c=>`<td class="${['SERIAL','CD PAT'].includes(c)?'mono':''}">${c==='EQUIPAMENTO'?`<button class="ebtn" data-e="${esc(r.ID)}" title="Editar todas as informações">✎</button>`:''}${DATE_COLS.includes(c)?br(r[c]):esc(r[c]||'—')}</td>`).join('')}<td>${pill(status(r))}</td><td><button class="btn sm" data-e="${esc(r.ID)}">Editar</button> <button class="btn sm danger" data-d="${esc(r.ID)}">✕</button></td></tr>`).join('')}</tbody>`;
+  ${sorted(d).map(r=>`<tr>${TABLE_COLS.map(c=>`<td class="${['SERIAL','CD PAT'].includes(c)?'mono':''}">${c==='EQUIPAMENTO'?`<button class="ebtn" data-e="${esc(r.ID)}" title="Editar todas as informações">✎</button>`:''}${DATE_COLS.includes(c)?br(r[c]):esc(r[c]||'—')}</td>`).join('')}<td>${pill(status(r))}</td><td><button class="btn sm" data-e="${esc(r.ID)}">Editar</button></td></tr>`).join('')}</tbody>`;
   $('#table').querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{ state.sort={k:th.dataset.k,d:state.sort.k===th.dataset.k?-state.sort.d:1}; render(); });
   $('#table').querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>openForm(rows.find(r=>r.ID===b.dataset.e)));
-  $('#table').querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>del(b.dataset.d));
 }
 
 /* ======================= CRUD ======================= */
