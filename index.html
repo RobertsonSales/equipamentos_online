@@ -259,7 +259,7 @@ button,input,select,textarea{touch-action:manipulation}button:focus-visible,inpu
 <div class="modal" id="mForm"><div class="box">
   <div class="hd"><h3 id="fTitle" style="margin:0">Equipamento</h3><div id="fTransferSearch" class="field ac transfer-search"></div><button class="btn sm" onclick="closeM('mForm')">✕</button></div>
   <form id="form" onsubmit="saveForm(event)"><div class="bd" id="fBody"></div>
-  <div class="ft"><button type="button" class="btn danger" id="fDel" onclick="delCurrent()">Excluir</button><div class="spacer"></div><button type="button" class="btn" onclick="closeM('mForm')">Cancelar</button><button class="btn primary">Salvar</button></div></form>
+  <div class="ft"><div class="spacer"></div><button type="button" class="btn" onclick="closeM('mForm')">Cancelar</button><button class="btn primary">Salvar</button></div></form>
 </div></div>
 
 <!-- Transferir unidade -->
@@ -331,7 +331,6 @@ function demo(method,p){
   if(method==='GET') return db;
   if(p.action==='create'){ p.record.ID='demo-'+Date.now(); db.push(p.record); }
   if(p.action==='update'){ db = db.map(r=>r.ID===p.record.ID?p.record:r); }
-  if(p.action==='delete'){ db = db.filter(r=>r.ID!==p.id); }
   localStorage.setItem('pat_demo',JSON.stringify(db)); return p.record||{};
 }
 const busy = on => $('#loader').classList.toggle('on',on);
@@ -577,7 +576,7 @@ function renderTable(d){
 
 /* ======================= CRUD ======================= */
 function openForm(r){
-  current = r||null; $('#fTitle').textContent = r?`Editar · ${r.EQUIPAMENTO}`:'Novo equipamento'; $('#fDel').style.display=r?'':'none';
+  current = r||null; $('#fTitle').textContent = r?`Editar · ${r.EQUIPAMENTO}`:'Novo equipamento';
   const one=k=>sel(k).length===1?sel(k)[0]:''; const base = r || {CLIENTE:one('CLIENTE'),UNIDADE:one('UNIDADE'),REGIÃO:one('REGIÃO')};
   $('#fBody').innerHTML = FORM_COLS.map(c=>`<div class="field"><label>${c}</label><input name="${c}" ${DATE_COLS.includes(c)?'type="date"':''} list="dl-${norm(c).replace(/\W/g,'')}" value="${esc(base[c]??'')}" ${['CLIENTE','UNIDADE','EQUIPAMENTO'].includes(c)?'required':''}></div>`).join('')
     + ["CLIENTE","UNIDADE","CATEGORIA","RESPONSAVÉL","REGIÃO","EQUIPAMENTO"].map(c=>`<datalist id="dl-${norm(c).replace(/\W/g,'')}">${uniq(c).map(v=>`<option value="${esc(v)}">`).join('')}</datalist>`).join('');
@@ -604,9 +603,6 @@ async function saveForm(e){
   try{ await api('POST',{action:current?'update':'create',record:rec}); closeM('mForm'); toast(current?'Registro atualizado':'Registro criado'); await reload(); }
   catch(err){ toast('Erro: '+err.message); } busy(false);
 }
-async function del(id){ const r=rows.find(x=>x.ID===id); if(!confirm(`Excluir ${r?.EQUIPAMENTO} (${r?.SERIAL})?`)) return;
-  busy(true); try{ await api('POST',{action:'delete',id}); closeM('mForm'); toast('Registro excluído'); await reload(); }catch(err){ toast('Erro: '+err.message); } busy(false); }
-const delCurrent = () => current && del(current.ID);
 const closeM = id => $('#'+id).classList.remove('open');
 let trFrom=null;
 function openTransfer(cli,u){ trFrom={cli,u}; const n=rows.filter(r=>String(r.CLIENTE||'—')===cli&&String(r.UNIDADE||'—')===u).length;
