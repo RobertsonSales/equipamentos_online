@@ -178,6 +178,52 @@ a.btn,a.btn:visited{color:var(--text);text-decoration:none}   /* link 'Gerenciad
 @media (max-width:360px){
   .filters,.kpis{grid-template-columns:1fr}
 }
+/* ===== Filtros com busca + checkboxes (seleção múltipla) ===== */
+.fdd{position:relative;min-width:0}
+.fdd-btn{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 11px;border-radius:10px;border:1px solid var(--line);background:var(--panel);cursor:pointer;text-align:left;min-width:0}
+.fdd-btn:hover,.fdd.open .fdd-btn{border-color:var(--brand)}
+.fdd.active .fdd-btn{border-color:#14b8a6aa;background:#14b8a614}
+.fdd-txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.fdd-car{color:var(--muted);flex:0 0 auto;transition:transform .15s}
+.fdd.open .fdd-car{transform:rotate(180deg)}
+.fdd-panel{display:none;position:absolute;z-index:40;top:calc(100% + 6px);left:0;width:max(100%,280px);max-width:min(380px,calc(100vw - 24px));background:var(--panel2);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:10px}
+.fdd.open .fdd-panel{display:block}
+.filters>.fdd:nth-child(n+4) .fdd-panel{left:auto;right:0}      /* colunas da direita abrem para a esquerda */
+.fdd-head{display:none;align-items:center;justify-content:space-between;margin-bottom:8px}
+.fdd-x{background:none;border:0;color:var(--muted);font-size:16px;cursor:pointer;padding:4px 6px}
+.fdd-search{width:100%;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--panel);outline:none;margin-bottom:8px}
+.fdd-search:focus{border-color:var(--brand)}
+.fdd-tools{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 2px 8px;border-bottom:1px solid var(--line);margin-bottom:6px;flex-wrap:wrap}
+.fdd-all{display:flex!important;align-items:center;gap:8px;margin:0!important;text-transform:none!important;letter-spacing:0!important;font-size:13px!important;color:var(--text)!important;cursor:pointer;font-weight:600}
+.fdd-clear{background:none;border:0;color:#5eead4;font-size:12.5px;cursor:pointer;padding:4px 2px;font-weight:600}
+.fdd-clear:hover{text-decoration:underline}
+.fdd-list{max-height:clamp(180px,38vh,300px);overflow-y:auto;overscroll-behavior:contain}
+.fdd-item{display:flex!important;align-items:flex-start;gap:9px;padding:7px 4px;border-radius:7px;cursor:pointer;margin:0!important;text-transform:none!important;letter-spacing:0!important;font-size:13.5px!important;color:var(--text)!important}
+.fdd-item:hover{background:#ffffff0a}
+.fdd-item.hide{display:none!important}
+.fdd-item.out{opacity:.55}
+.fdd-v{flex:1;min-width:0;overflow-wrap:anywhere;line-height:1.35}
+.fdd-item small{color:var(--muted);font-size:11.5px;padding-top:2px}
+.fdd-empty{padding:10px 4px;color:var(--muted);font-size:13px}
+/* Checkboxes com tamanho e contraste próprios (independem do navegador) */
+.fdd-panel input[type=checkbox]{-webkit-appearance:none;appearance:none;flex:0 0 18px;width:18px;height:18px;margin:1px 0 0;border:2px solid #6b7aa3;border-radius:5px;background:#0c1222;cursor:pointer;display:grid;place-content:center;transition:.12s}
+.fdd-panel input[type=checkbox]:checked{background:var(--brand);border-color:var(--brand)}
+.fdd-panel input[type=checkbox]:checked::after{content:"";width:5px;height:9px;border:solid #04131a;border-width:0 2.5px 2.5px 0;transform:translateY(-1px) rotate(45deg)}
+.fdd-panel input[type=checkbox]:indeterminate{background:var(--brand);border-color:var(--brand)}
+.fdd-panel input[type=checkbox]:indeterminate::after{content:"";width:9px;height:2.5px;background:#04131a;border-radius:2px}
+.fdd-panel input[type=checkbox]:disabled{opacity:.4;cursor:default}
+.fdd-panel input[type=checkbox]:focus-visible{outline:2px solid var(--brand2);outline-offset:2px}
+/* Celular: a caixa abre como painel inferior ocupando a largura da tela */
+@media (max-width:600px){
+  .fdd.open::before{content:"";position:fixed;inset:0;background:#0009;z-index:39}
+  .fdd-panel{position:fixed;left:8px!important;right:8px!important;bottom:8px;top:auto;width:auto;max-width:none;max-height:78vh;display:none;flex-direction:column;padding:12px}
+  .fdd.open .fdd-panel{display:flex}
+  .fdd-head{display:flex}
+  .fdd-search{font-size:16px}
+  .fdd-list{max-height:none;flex:1;min-height:120px}
+  .fdd-item{padding:10px 4px;font-size:15px!important}
+  .fdd-panel input[type=checkbox]{flex-basis:22px;width:22px;height:22px}
+}
 </style>
 </head>
 <body>
@@ -295,28 +341,106 @@ async function reload(){
 }
 
 /* ======================= FILTROS & BUSCA ======================= */
+/* Cada filtro de lista é uma caixa com busca + checkboxes de seleção múltipla
+   (Marcar todos / Desmarcar todos). state.f[k] guarda um ARRAY de valores
+   escolhidos; vazio = "Todos". Datas (_de/_ate) continuam como texto. */
 const FILTERS = [["CLIENTE","Cliente"],["UNIDADE","Unidade"],["CATEGORIA","Categoria"],["EQUIPAMENTO","Equipamento"],["REGIÃO","Região"],["_status","Status preventiva"]];
 const cmpPt = (a,b) => String(a).localeCompare(String(b),'pt-BR',{numeric:true});
 function uniq(k, list=rows){ return [...new Set(list.map(r=>k==='_status'?status(r):r[k]).filter(v=>v!==''&&v!=null).map(String))].sort(cmpPt); }
+const sel = k => { const v=state.f[k]; return Array.isArray(v) ? v : (v ? [String(v)] : []); };
+const single = k => { const a=sel(k); return a.length===1 ? a[0] : ''; };
+const valOf = (r,k) => k==='_status' ? status(r) : String(r[k] ?? '');
+const optText = (k,v) => k==='_status' ? ST[v] : v;
 /* Registro atende aos filtros ativos (opcionalmente ignorando um deles) */
 function matchF(r, skip){
-  for(const [k,v] of Object.entries(state.f)){
-    if(!v || k===skip) continue;
-    if(k==='_de'){ if(!(r['PROX.']>=v)) return false; continue; }
-    if(k==='_ate'){ if(!(r['PROX.'] && r['PROX.']<=v)) return false; continue; }
-    if(k==='_status'){ if(status(r)!==v) return false; continue; }
-    if(String(r[k])!==v) return false;
-  }
+  for(const [k] of FILTERS){ if(k===skip) continue; const a=sel(k); if(a.length && !a.includes(valOf(r,k))) return false; }
+  if(skip!=='_de' && state.f._de && !(r['PROX.']>=state.f._de)) return false;
+  if(skip!=='_ate' && state.f._ate && !(r['PROX.'] && r['PROX.']<=state.f._ate)) return false;
   return true;
 }
-/* Opções de cada lista = valores existentes considerando os DEMAIS filtros (cascata).
-   O valor já escolhido permanece visível para não "sumir" da tela. */
-function optionsFor(k){ const vals=uniq(k, rows.filter(r=>matchF(r,k))); const cur=state.f[k]; if(cur && !vals.includes(cur)) vals.unshift(cur); return vals; }
-function buildFilters(){
-  $('#filters').innerHTML = FILTERS.map(([k,l])=>{ const opts=optionsFor(k); return `<div><label>${l} <small>(${opts.length})</small></label><select data-k="${k}" title="${l}"><option value="">Todos</option>${opts.map(v=>`<option value="${esc(v)}" ${state.f[k]==v?'selected':''}>${esc(k==='_status'?ST[v]:v)}</option>`).join('')}</select></div>`; }).join('')
-   + `<div><label>Próx. preventiva de</label><input type="date" data-k="_de" value="${state.f._de||''}"></div><div><label>até</label><input type="date" data-k="_ate" value="${state.f._ate||''}"></div>`;
-  $('#filters').querySelectorAll('select,input').forEach(el=>el.onchange=()=>{ state.f[el.dataset.k]=el.value; if(el.dataset.k==='CLIENTE') state.f.UNIDADE=''; buildFilters(); render(); });
+/* Opções = valores existentes considerando os DEMAIS filtros (cascata), com contagem.
+   Itens já marcados continuam visíveis mesmo que saiam do escopo. */
+function optionsFor(k){
+  const cnt=new Map(); rows.filter(r=>matchF(r,k)).forEach(r=>{ const v=valOf(r,k); if(v!=='') cnt.set(v,(cnt.get(v)||0)+1); });
+  sel(k).forEach(v=>{ if(!cnt.has(v)) cnt.set(v,0); });
+  return [...cnt.entries()].sort((a,b)=>cmpPt(optText(k,a[0]),optText(k,b[0])));
 }
+/* Lista de filtros ativos (usada nos chips, no Excel e no PDF) */
+function activeFilters(){
+  const L=[];
+  FILTERS.forEach(([k,l])=>{ const a=sel(k); if(a.length) L.push([k,l,a.map(v=>optText(k,v)).join(', ')]); });
+  if(state.f._de) L.push(['_de','Próx. preventiva de',br(state.f._de)]);
+  if(state.f._ate) L.push(['_ate','Próx. preventiva até',br(state.f._ate)]);
+  return L;
+}
+function setSel(k, arr){ state.f[k]=[...new Set(arr)]; if(k==='CLIENTE') state.f.UNIDADE=[]; }
+
+function buildFilters(){
+  const box=$('#filters');
+  if(!box.dataset.ready){
+    box.innerHTML = FILTERS.map(([k,l])=>`
+      <div class="fdd" data-k="${k}">
+        <label>${l} <small class="fdd-n"></small></label>
+        <button type="button" class="fdd-btn" aria-haspopup="true" aria-expanded="false"><span class="fdd-txt">Todos</span><span class="fdd-car">▾</span></button>
+        <div class="fdd-panel" role="dialog" aria-label="Filtro ${l}">
+          <div class="fdd-head"><b>${l}</b><button type="button" class="fdd-x" aria-label="Fechar">✕</button></div>
+          <input type="search" class="fdd-search" placeholder="Buscar ${l.toLowerCase()}…" autocomplete="off">
+          <div class="fdd-tools">
+            <label class="fdd-all"><input type="checkbox" class="fdd-allcb"> <span>Marcar todos</span></label>
+            <button type="button" class="fdd-clear">Desmarcar todos</button>
+          </div>
+          <div class="fdd-list"></div>
+        </div>
+      </div>`).join('')
+      + `<div><label>Próx. preventiva de</label><input type="date" data-k="_de"></div><div><label>até</label><input type="date" data-k="_ate"></div>`;
+    box.dataset.ready='1';
+
+    box.querySelectorAll('input[type=date]').forEach(el=>el.onchange=()=>{ state.f[el.dataset.k]=el.value; buildFilters(); render(); });
+    box.querySelectorAll('.fdd').forEach(dd=>{
+      const k=dd.dataset.k, panel=dd.querySelector('.fdd-panel'), btn=dd.querySelector('.fdd-btn'), search=dd.querySelector('.fdd-search');
+      btn.onclick=e=>{ e.stopPropagation(); const open=!dd.classList.contains('open'); closeAllFdd(); if(open){ dd.classList.add('open'); btn.setAttribute('aria-expanded','true'); setTimeout(()=>search.focus(),0); } };
+      dd.querySelector('.fdd-x').onclick=()=>closeAllFdd();
+      panel.addEventListener('click',e=>e.stopPropagation());
+      search.oninput=()=>applyFddSearch(dd);
+      search.onkeydown=e=>{ if(e.key==='Escape') closeAllFdd(); };
+      /* Marcar todos = marca todos os itens VISÍVEIS (respeita a busca digitada); desmarcar = remove-os */
+      dd.querySelector('.fdd-allcb').onchange=e=>{
+        const vis=[...dd.querySelectorAll('.fdd-item:not(.hide) input')].map(i=>i.value);
+        setSel(k, e.target.checked ? sel(k).concat(vis) : sel(k).filter(v=>!vis.includes(v)));
+        buildFilters(); render();
+      };
+      dd.querySelector('.fdd-clear').onclick=()=>{ setSel(k,[]); search.value=''; buildFilters(); render(); };
+      dd.querySelector('.fdd-list').addEventListener('change',e=>{
+        if(!e.target.matches('.fdd-item input')) return;
+        const v=e.target.value; setSel(k, e.target.checked ? sel(k).concat(v) : sel(k).filter(x=>x!==v));
+        buildFilters(); render();
+      });
+    });
+  }
+  /* Atualiza listas, contagens e rótulos sem fechar a caixa aberta nem apagar a busca */
+  box.querySelectorAll('.fdd').forEach(dd=>{
+    const k=dd.dataset.k, opts=optionsFor(k), chosen=sel(k), list=dd.querySelector('.fdd-list'), top=list.scrollTop;
+    dd.querySelector('.fdd-n').textContent=`(${opts.length})`;
+    list.innerHTML = opts.length ? opts.map(([v,n])=>`<label class="fdd-item${n===0?' out':''}"><input type="checkbox" value="${esc(v)}" ${chosen.includes(v)?'checked':''}><span class="fdd-v">${esc(optText(k,v))}</span><small>${n}</small></label>`).join('')
+      : '<div class="fdd-empty">Nenhuma opção com os filtros atuais.</div>';
+    list.scrollTop=top;
+    const txt = !chosen.length ? 'Todos' : chosen.length===1 ? optText(k,chosen[0]) : `${chosen.length} selecionados`;
+    dd.querySelector('.fdd-txt').textContent=txt; dd.querySelector('.fdd-btn').title=chosen.map(v=>optText(k,v)).join(', ')||'Todos';
+    dd.classList.toggle('active', chosen.length>0);
+    applyFddSearch(dd);
+  });
+  box.querySelectorAll('input[type=date]').forEach(el=>{ el.value=state.f[el.dataset.k]||''; });
+}
+function applyFddSearch(dd){
+  const t=norm(dd.querySelector('.fdd-search').value), items=[...dd.querySelectorAll('.fdd-item')];
+  items.forEach(it=>it.classList.toggle('hide', !!t && !norm(it.querySelector('.fdd-v').textContent).includes(t)));
+  const vis=items.filter(it=>!it.classList.contains('hide')), on=vis.filter(it=>it.querySelector('input').checked).length;
+  const all=dd.querySelector('.fdd-allcb'); all.checked = vis.length>0 && on===vis.length; all.indeterminate = on>0 && on<vis.length; all.disabled = !vis.length;
+  dd.querySelector('.fdd-all span').textContent = t ? `Marcar todos os ${vis.length} encontrados` : 'Marcar todos';
+}
+function closeAllFdd(){ document.querySelectorAll('.fdd.open').forEach(d=>{ d.classList.remove('open'); d.querySelector('.fdd-btn').setAttribute('aria-expanded','false'); }); }
+document.addEventListener('click', closeAllFdd);
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeAllFdd(); });
 function parseQuery(q){
   const terms=[], fields={};
   q.replace(/(\w+):("[^"]+"|\S+)|("[^"]+"|\S+)/g,(m,k,v,t)=>{
@@ -339,9 +463,9 @@ function filtered(){
 function chips(){
   const c=[];
   if(state.q) c.push(['q',`Busca: “${state.q}”`]);
-  for(const [k,v] of Object.entries(state.f)) if(v) c.push([k,`${(FILTERS.find(f=>f[0]===k)||[,k==='_de'?'De':'Até'])[1]}: ${k==='_status'?ST[v]:(k[0]==='_'?br(v):v)}`]);
+  activeFilters().forEach(([k,l,t])=>c.push([k,`${l}: ${t.length>60?t.slice(0,57)+'…':t}`]));
   $('#chips').innerHTML = c.map(([k,l])=>`<span class="chip" data-k="${k}">${esc(l)} ✕</span>`).join('') + (c.length?`<span class="chip" data-k="*">Limpar tudo</span>`:'');
-  $('#chips').querySelectorAll('.chip').forEach(el=>el.onclick=()=>{ const k=el.dataset.k; if(k==='*'){state.f={};state.q='';} else if(k==='q') state.q=''; else state.f[k]=''; $('#q').value=state.q; buildFilters(); render(); });
+  $('#chips').querySelectorAll('.chip').forEach(el=>el.onclick=()=>{ const k=el.dataset.k; if(k==='*'){state.f={};state.q='';} else if(k==='q') state.q=''; else delete state.f[k]; $('#q').value=state.q; buildFilters(); render(); });
 }
 
 /* Sugestões da busca */
@@ -380,7 +504,7 @@ function renderKpis(d){
     ['Em dia',c.emdia,'próxima > 30 dias','var(--ok)',c.emdia/n*100,'emdia'],
   ];
   $('#kpis').innerHTML = K.map(([l,v,s,col,p,st])=>`<div class="kpi" style="--c:${col}" ${st?`data-st="${st}"`:''}><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div><div class="bar"><b style="width:${Math.min(100,p)}%"></b></div></div>`).join('');
-  $('#kpis').querySelectorAll('[data-st]').forEach(el=>el.onclick=()=>{ state.f._status = state.f._status===el.dataset.st?'':el.dataset.st; buildFilters(); render(); });
+  $('#kpis').querySelectorAll('[data-st]').forEach(el=>el.onclick=()=>{ state.f._status = (single('_status')===el.dataset.st && sel('_status').length===1) ? [] : [el.dataset.st]; buildFilters(); render(); });
 }
 function insightsList(d){
   const L=[]; if(!d.length) return ['Nenhum registro no cenário atual.'];
@@ -404,7 +528,7 @@ function renderCharts(d){
   const c={vencida:0,proxima:0,emdia:0,sem:0}; d.forEach(r=>c[status(r)]++);
   chart('chStatus',{type:'doughnut',data:{labels:Object.values(ST),datasets:[{data:Object.values(c),backgroundColor:['#ef4444','#f59e0b','#22c55e','#475569'],borderWidth:0}]},options:{cutout:'68%',plugins:{legend:{position:'bottom'}}}});
   const cat={}; d.forEach(r=>cat[r.CATEGORIA]=(cat[r.CATEGORIA]||0)+1); const ce=Object.entries(cat).sort((a,b)=>b[1]-a[1]);
-  chart('chCat',{type:'bar',data:{labels:ce.map(x=>x[0]),datasets:[{data:ce.map(x=>x[1]),backgroundColor:'#14b8a6',borderRadius:6}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{precision:0}}},onClick:(e,el)=>{ if(el[0]){state.f.CATEGORIA=ce[el[0].index][0];buildFilters();render();} }}});
+  chart('chCat',{type:'bar',data:{labels:ce.map(x=>x[0]),datasets:[{data:ce.map(x=>x[1]),backgroundColor:'#14b8a6',borderRadius:6}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{precision:0}}},onClick:(e,el)=>{ if(el[0]){state.f.CATEGORIA=[ce[el[0].index][0]];buildFilters();render();} }}});
   const months=[...Array(12)].map((_,i)=>new Date(today.getFullYear(),today.getMonth()+i,1));
   const cnt=months.map(m=>d.filter(r=>{const x=pd(r['PROX.']);return x&&x.getFullYear()===m.getFullYear()&&x.getMonth()===m.getMonth();}).length);
   chart('chAgenda',{type:'bar',data:{labels:months.map(m=>m.toLocaleDateString('pt-BR',{month:'short',year:'2-digit'})),datasets:[{data:cnt,backgroundColor:cnt.map((_,i)=>i===0?'#f59e0b':'#0ea5e9'),borderRadius:6}]},options:{plugins:{legend:{display:false}},scales:{y:{ticks:{precision:0}}}}});
@@ -435,7 +559,7 @@ function renderTable(d){
 /* ======================= CRUD ======================= */
 function openForm(r){
   current = r||null; $('#fTitle').textContent = r?`Editar · ${r.EQUIPAMENTO}`:'Novo equipamento'; $('#fDel').style.display=r?'':'none';
-  const base = r || {CLIENTE:state.f.CLIENTE||'',UNIDADE:state.f.UNIDADE||'',REGIÃO:state.f['REGIÃO']||''};
+  const base = r || {CLIENTE:single('CLIENTE'),UNIDADE:single('UNIDADE'),REGIÃO:single('REGIÃO')};
   $('#fBody').innerHTML = COLS.map(c=>`<div class="field"><label>${c}</label><input name="${c}" ${DATE_COLS.includes(c)?'type="date"':''} list="dl-${norm(c).replace(/\W/g,'')}" value="${esc(base[c]??'')}" ${['CLIENTE','UNIDADE','EQUIPAMENTO'].includes(c)?'required':''}></div>`).join('')
     + ["CLIENTE","UNIDADE","CATEGORIA","RESPONSAVÉL","REGIÃO","EQUIPAMENTO"].map(c=>`<datalist id="dl-${norm(c).replace(/\W/g,'')}">${uniq(c).map(v=>`<option value="${esc(v)}">`).join('')}</datalist>`).join('');
   const prev=$('#fBody [name="PREV. ATUAL"]'), prox=$('#fBody [name="PROX."]');
@@ -458,9 +582,7 @@ document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{ i
 function filterSummary(){
   const L=[];
   if(state.q) L.push(['Busca',state.q]);
-  for(const [k,v] of Object.entries(state.f)){ if(!v) continue;
-    const lbl=(FILTERS.find(f=>f[0]===k)||[,k==='_de'?'Próx. preventiva de':'Próx. preventiva até'])[1];
-    L.push([lbl, k==='_status'?ST[v]:(k[0]==='_'?br(v):v)]); }
+  activeFilters().forEach(([k,l,t])=>L.push([l,t]));
   return L.length?L:[['Filtros','Nenhum (todos os registros)']];
 }
 async function exportXlsx(){
@@ -567,8 +689,8 @@ function buildPdf(){
   doc.text('Emitido em '+new Date().toLocaleString('pt-BR'),W-14,14,{align:'right'}); doc.text(`${d.length} equipamento(s) no cenário`,W-14,21,{align:'right'});
   // Filtros aplicados
   let y=40; doc.setTextColor(...C.muted); doc.setFontSize(8.5);
-  const fl=[]; if(state.q) fl.push('Busca: '+state.q); for(const [k,v] of Object.entries(state.f)) if(v) fl.push(`${(FILTERS.find(f=>f[0]===k)||[,k==='_de'?'De':'Até'])[1]}: ${k==='_status'?ST[v]:(k[0]==='_'?br(v):v)}`);
-  doc.text('FILTROS APLICADOS: '+(fl.join('  ·  ')||'Nenhum (visão completa)'),14,y);
+  const fl=[]; if(state.q) fl.push('Busca: '+state.q); activeFilters().forEach(([k,l,t])=>fl.push(`${l}: ${t}`));
+  { const fls=doc.splitTextToSize('FILTROS APLICADOS: '+(fl.join('  ·  ')||'Nenhum (visão completa)'),W-28).slice(0,3); doc.text(fls,14,y); y+=(fls.length-1)*3.8; }
   // KPIs
   y+=6; const c={vencida:0,proxima:0,emdia:0,sem:0}; d.forEach(r=>c[status(r)]++); const n=d.length||1;
   const K=[['Equipamentos',d.length,C.brand],['Clientes',new Set(d.map(r=>r.CLIENTE)).size,[14,165,233]],['Unidades',new Set(d.map(r=>r.CLIENTE+r.UNIDADE)).size,[99,102,241]],['Conformidade',Math.round((c.emdia+c.proxima)/n*100)+'%',[34,197,94]],['Vencidas',c.vencida,[239,68,68]],['Vencem em 30d',c.proxima,[245,158,11]]];
