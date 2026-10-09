@@ -1,7 +1,27 @@
 /**
- * API de Patrimônio — Google Apps Script (backend do CRUD)
+ * API de Patrimônio — Google Apps Script (backend único das duas aplicações)
+ *   - Atualizador da planilha  (equipamentosonline.vercel.app) → API_TOKEN  → leitura + gravação
+ *   - Gerenciador de Patrimônio (patrimonio-ten.vercel.app)   → READ_TOKEN → somente leitura
+ *
+ * Propriedades do script (Configurações do projeto › Propriedades do script):
+ *   API_TOKEN  (obrigatória) — lê e grava. Fica só no projeto Vercel do Atualizador.
+ *   READ_TOKEN (recomendada) — só lê. Fica no projeto Vercel do Gerenciador.
+ *              Se não existir, o Gerenciador pode usar o API_TOKEN (compatibilidade).
+ *
  * Planilha: aba "Patrimônio aferido" com cabeçalho na linha 1.
- * Uma coluna "ID" é criada automaticamente (coluna A) para identificar cada registro.
+ * A coluna "ID" (coluna A) é criada/preenchida automaticamente.
+ *
+ * v2.1 — mudanças em relação à v2:
+ *   • cabeçalhos com espaços extras são aparados (evita "CNPJ " ≠ "CNPJ");
+ *   • linhas digitadas DIRETAMENTE na planilha (sem ID) recebem um ID na
+ *     próxima leitura — antes elas apareciam no app mas não podiam ser
+ *     editadas/excluídas ("Registro não encontrado");
+ *   • ação "ping" no GET para diagnóstico de token/implantação;
+ *   • token somente leitura (READ_TOKEN): aceito no GET, recusado no POST.
+ *
+ * Contrato da API inalterado (doGet/doPost) — não exige mudanças nos apps.
+ * Os apps leem as colunas PELO NOME do cabeçalho; reordenar ou inserir
+ * colunas na planilha não quebra a leitura (renomear, sim).
  */
 const SHEET_NAME = 'Patrimônio aferido';
 const ID_COL = 'ID';
@@ -10,31 +30,60 @@ function getToken_() {
   return PropertiesService.getScriptProperties().getProperty('API_TOKEN') || '';
 }
 
-function spreadsheet_() {
-  // Script vinculado à planilha (Extensões › Apps Script): getActive() funciona.
-  // Script avulso: defina a propriedade SHEET_ID (ID da planilha) em Propriedades do script.
-  const active = SpreadsheetApp.getActive();
-  if (active) return active;
-  const id = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
-  if (!id) throw new Error('Script avulso: defina a propriedade SHEET_ID com o ID da planilha');
-  return SpreadsheetApp.openById(id);
+function getReadToken_() {
+  return PropertiesService.getScriptProperties().getProperty('READ_TOKEN') || '';
+}
+
+/** Leitura: aceita o token de gravação ou o de leitura. Tokens vazios nunca são aceitos. */
+function canRead_(token) {
+  const t = String(token || '');
+  if (!t) return false;
+  return t === getToken_() || (getReadToken_() !== '' && t === getReadToken_());
+}
+
+/** Gravação: somente o API_TOKEN. */
+function canWrite_(token) {
+  const t = String(token || '');
+  return t !== '' && t === getToken_();
 }
 
 function sheet_() {
-  const sh = spreadsheet_().getSheetByName(SHEET_NAME);
+  const sh = SpreadsheetApp.getActive().getSheetByName(SHEET_NAME);
   if (!sh) throw new Error('Aba "' + SHEET_NAME + '" não encontrada');
   const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
-  if (headers[0] !== ID_COL) {
+  if (String(headers[0]).trim() !== ID_COL) {
     sh.insertColumnBefore(1);
     sh.getRange(1, 1).setValue(ID_COL);
-    const n = sh.getLastRow() - 1;
-    if (n > 0) sh.getRange(2, 1, n, 1).setValues(Array.from({ length: n }, () => [Utilities.getUuid()]));
   }
+  backfillIds_(sh);
   return sh;
 }
 
+/** Garante ID em toda linha com conteúdo (inclusive linhas incluídas à mão na planilha). */
+function backfillIds_(sh) {
+  const last = sh.getLastRow();
+  if (last < 2) return;
+  const width = sh.getLastColumn();
+  const vals = sh.getRange(2, 1, last - 1, width).getValues();
+  const missing = [];
+  vals.forEach((r, i) => {
+    const hasData = r.slice(1).some(c => c !== '' && c !== null);
+    if (hasData && String(r[0]).trim() === '') missing.push(i);
+  });
+  if (!missing.length) return;
+
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return; // outra execução já está gravando; tenta na próxima leitura
+  try {
+    const idRange = sh.getRange(2, 1, last - 1, 1);
+    const ids = idRange.getValues();
+    missing.forEach(i => { if (String(ids[i][0]).trim() === '') ids[i][0] = Utilities.getUuid(); });
+    idRange.setValues(ids);
+  } finally { lock.releaseLock(); }
+}
+
 function headers_(sh) {
-  return sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+  return sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(h => String(h).trim());
 }
 
 function fmt_(v) {
@@ -49,7 +98,7 @@ function list_() {
   if (last < 2) return { headers: h, rows: [] };
   const vals = sh.getRange(2, 1, last - 1, h.length).getValues();
   const rows = vals
-    .filter(r => r.some(c => c !== '' && c !== null))
+    .filter(r => r.slice(1).some(c => c !== '' && c !== null))
     .map(r => Object.fromEntries(h.map((k, i) => [k, fmt_(r[i])])));
   return { headers: h, rows };
 }
@@ -109,15 +158,17 @@ function json_(o) {
 
 function doGet(e) {
   try {
-    if ((e.parameter.token || '') !== getToken_()) return json_({ ok: false, error: 'Token inválido' });
+    const p = (e && e.parameter) || {};
+    if (!canRead_(p.token)) return json_({ ok: false, error: 'Token inválido' });
+    if (p.action === 'ping') return json_({ ok: true, data: { sheet: SHEET_NAME, at: new Date().toISOString() } });
     return json_({ ok: true, data: list_() });
   } catch (err) { return json_({ ok: false, error: String(err.message || err) }); }
 }
 
 function doPost(e) {
   try {
-    const body = JSON.parse(e.postData.contents || '{}');
-    if ((body.token || '') !== getToken_()) return json_({ ok: false, error: 'Token inválido' });
+    const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    if (!canWrite_(body.token)) return json_({ ok: false, error: 'Token sem permissão de gravação' });
     let data;
     switch (body.action) {
       case 'create': data = create_(body.record); break;
