@@ -94,7 +94,90 @@ tr:hover td{background:#ffffff06}
 .spin{width:42px;height:42px;border:4px solid #ffffff22;border-top-color:var(--brand);border-radius:50%;animation:s 1s linear infinite}
 @keyframes s{to{transform:rotate(360deg)}}
 iframe.pdf{width:100%;height:78vh;border:0;border-radius:0 0 18px 18px;background:#fff}
-@media(max-width:1100px){.grid{grid-template-columns:1fr}header{flex-wrap:wrap}}
+/* ==========================================================
+   v2.2 — RESPONSIVIDADE (notebooks pequenos, tablets e celulares)
+   ========================================================== */
+.hd-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+a.btn,a.btn:visited{color:var(--text);text-decoration:none}   /* link 'Gerenciador' estava azul sobre fundo escuro */
+.toast:not(.show){visibility:hidden}
+.filters label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.grid.grid-2{grid-template-columns:2fr 1fr}
+/* Gráficos: altura definida aqui (não pela proporção do canvas) */
+.chbox{position:relative;height:240px}
+.chbox.chbox-wide{height:220px}
+.chbox canvas{position:absolute;inset:0;width:100%!important;height:100%!important}
+/* Filtros: colunas nunca estouram a largura, mesmo com nomes longos */
+.filters{grid-template-columns:repeat(auto-fit,minmax(min(100%,165px),1fr))}
+.filters>div{min-width:0}
+.filters select,.filters input{max-width:100%;min-width:0;text-overflow:ellipsis}
+.filters label small{text-transform:none;letter-spacing:0;opacity:.75}
+.tree summary{flex-wrap:wrap;row-gap:6px}
+.tree summary b{min-width:0;overflow-wrap:anywhere}
+.tree .eqs{grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr))}
+.tablewrap{max-height:72vh;-webkit-overflow-scrolling:touch}
+.section-title{flex-wrap:wrap}
+.modal .bd{grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr))}
+
+/* Notebooks pequenos: até 1280px de largura ou até 760px de altura */
+@media (max-width:1280px), (max-height:760px){
+  header{padding:10px 18px;gap:12px}
+  main{padding:16px 18px 48px}
+  .search{min-width:240px}
+  .kpis{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+  .kpi{padding:12px 14px}
+  .kpi .v{font-size:26px}
+  .chbox{height:210px}
+  .chbox.chbox-wide{height:190px}
+  .filters{margin:12px 0;grid-template-columns:repeat(auto-fit,minmax(min(100%,128px),1fr));gap:8px}
+  .filters select,.filters input{padding:8px 9px}
+}
+/* Até 1280px: 3 cartões viram 2 colunas (insights ocupa a linha inteira) */
+@media (max-width:1280px){
+  .grid{grid-template-columns:1fr 1fr}
+  .grid>.card:first-child{grid-column:1/-1}
+  .grid.grid-2{grid-template-columns:1fr 1fr}
+  .grid.grid-2>.card:first-child{grid-column:auto}
+}
+/* Tablets */
+@media (max-width:900px){
+  header{flex-wrap:wrap;position:static}
+  .search{order:5;flex:1 1 100%;max-width:none;min-width:0}
+  .grid,.grid.grid-2{grid-template-columns:1fr}
+  .grid>.card:first-child{grid-column:auto}
+}
+/* Celulares */
+@media (max-width:600px){
+  header{position:static;padding:10px 12px;gap:8px}
+  .logo{font-size:16px}
+  .hd-actions{order:6;flex:1 1 100%;display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .hd-actions .btn{justify-content:center;padding:9px 4px;font-size:12.5px;white-space:nowrap}
+  .hd-actions .btn.primary{grid-column:1/-1}
+  .search input{font-size:16px}               /* evita zoom automático do iOS ao focar */
+  .search input::placeholder{font-size:13px}
+  main{padding:12px 12px 40px}
+  .filters{grid-template-columns:1fr 1fr;gap:8px}
+  .filters select,.filters input{font-size:16px;padding:8px 9px}
+  .kpis{grid-template-columns:1fr 1fr;gap:8px}
+  .kpi{padding:11px 12px}
+  .kpi .l{font-size:10.5px}
+  .kpi .v{font-size:22px}
+  .kpi .s{font-size:11px}
+  .card{padding:14px}
+  .chbox,.chbox.chbox-wide{height:220px}
+  .section-title h2{font-size:16px}
+  .tree summary{padding:10px}
+  .tree .unit{margin:0 6px 8px}
+  .tree .eqs{padding:0 8px 10px}
+  td,th{padding:8px 9px}
+  .modal{padding:10px 8px}
+  .modal .hd,.modal .bd,.modal .ft{padding-left:14px;padding-right:14px}
+  .modal .ft{flex-wrap:wrap}
+  iframe.pdf{height:70vh}
+  .toast{left:12px;right:12px;bottom:12px}
+}
+@media (max-width:360px){
+  .filters,.kpis{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
@@ -107,10 +190,12 @@ iframe.pdf{width:100%;height:78vh;border:0;border-radius:0 0 18px 18px;backgroun
     <div id="suggest" class="suggest"></div>
   </div>
   <div class="spacer"></div>
+  <div class="hd-actions">
   <a class="btn" href="https://patrimonio-ten.vercel.app/" target="_blank" rel="noopener" style="text-decoration:none" title="Gerenciador de Patrimônio (mesma planilha, somente leitura)">▦ Gerenciador</a>
   <button class="btn" onclick="reload()">↻ Atualizar</button>
   <button class="btn" onclick="openPdf()">⎙ Relatório PDF</button>
   <button class="btn primary" onclick="openForm()">＋ Novo equipamento</button>
+  </div>
 </header>
 
 <main>
@@ -121,12 +206,12 @@ iframe.pdf{width:100%;height:78vh;border:0;border-radius:0 0 18px 18px;backgroun
 
   <section class="grid">
     <div class="card"><h3>Insights automáticos <small>· cenário filtrado</small></h3><ul class="insights" id="insights"></ul></div>
-    <div class="card"><h3>Status das preventivas</h3><canvas id="chStatus" height="210"></canvas></div>
-    <div class="card"><h3>Equipamentos por categoria</h3><canvas id="chCat" height="210"></canvas></div>
+    <div class="card"><h3>Status das preventivas</h3><div class="chbox"><canvas id="chStatus"></canvas></div></div>
+    <div class="card"><h3>Equipamentos por categoria</h3><div class="chbox"><canvas id="chCat"></canvas></div></div>
   </section>
-  <section class="grid" style="grid-template-columns:2fr 1fr">
-    <div class="card"><h3>Agenda de preventivas <small>· próximos 12 meses</small></h3><canvas id="chAgenda" height="110"></canvas></div>
-    <div class="card"><h3>Carga por responsável</h3><canvas id="chResp" height="220"></canvas></div>
+  <section class="grid grid-2">
+    <div class="card"><h3>Agenda de preventivas <small>· próximos 12 meses</small></h3><div class="chbox chbox-wide"><canvas id="chAgenda"></canvas></div></div>
+    <div class="card"><h3>Carga por responsável</h3><div class="chbox"><canvas id="chResp"></canvas></div></div>
   </section>
 
   <div class="section-title"><h2>Clientes › Unidades › Equipamentos</h2><span class="badge" id="treeCount"></span></div>
@@ -210,12 +295,27 @@ async function reload(){
 }
 
 /* ======================= FILTROS & BUSCA ======================= */
-const FILTERS = [["CLIENTE","Cliente"],["UNIDADE","Unidade"],["CATEGORIA","Categoria"],["REGIÃO","Região"],["_status","Status preventiva"]];
-function uniq(k){ return [...new Set(rows.map(r=>k==='_status'?status(r):r[k]).filter(v=>v!==''&&v!=null))].sort(); }
+const FILTERS = [["CLIENTE","Cliente"],["UNIDADE","Unidade"],["CATEGORIA","Categoria"],["EQUIPAMENTO","Equipamento"],["REGIÃO","Região"],["_status","Status preventiva"]];
+const cmpPt = (a,b) => String(a).localeCompare(String(b),'pt-BR',{numeric:true});
+function uniq(k, list=rows){ return [...new Set(list.map(r=>k==='_status'?status(r):r[k]).filter(v=>v!==''&&v!=null).map(String))].sort(cmpPt); }
+/* Registro atende aos filtros ativos (opcionalmente ignorando um deles) */
+function matchF(r, skip){
+  for(const [k,v] of Object.entries(state.f)){
+    if(!v || k===skip) continue;
+    if(k==='_de'){ if(!(r['PROX.']>=v)) return false; continue; }
+    if(k==='_ate'){ if(!(r['PROX.'] && r['PROX.']<=v)) return false; continue; }
+    if(k==='_status'){ if(status(r)!==v) return false; continue; }
+    if(String(r[k])!==v) return false;
+  }
+  return true;
+}
+/* Opções de cada lista = valores existentes considerando os DEMAIS filtros (cascata).
+   O valor já escolhido permanece visível para não "sumir" da tela. */
+function optionsFor(k){ const vals=uniq(k, rows.filter(r=>matchF(r,k))); const cur=state.f[k]; if(cur && !vals.includes(cur)) vals.unshift(cur); return vals; }
 function buildFilters(){
-  $('#filters').innerHTML = FILTERS.map(([k,l])=>`<div><label>${l}</label><select data-k="${k}"><option value="">Todos</option>${uniq(k).map(v=>`<option value="${esc(v)}" ${state.f[k]==v?'selected':''}>${esc(k==='_status'?ST[v]:v)}</option>`).join('')}</select></div>`).join('')
+  $('#filters').innerHTML = FILTERS.map(([k,l])=>{ const opts=optionsFor(k); return `<div><label>${l} <small>(${opts.length})</small></label><select data-k="${k}" title="${l}"><option value="">Todos</option>${opts.map(v=>`<option value="${esc(v)}" ${state.f[k]==v?'selected':''}>${esc(k==='_status'?ST[v]:v)}</option>`).join('')}</select></div>`; }).join('')
    + `<div><label>Próx. preventiva de</label><input type="date" data-k="_de" value="${state.f._de||''}"></div><div><label>até</label><input type="date" data-k="_ate" value="${state.f._ate||''}"></div>`;
-  $('#filters').querySelectorAll('select,input').forEach(el=>el.onchange=()=>{ state.f[el.dataset.k]=el.value; if(el.dataset.k==='CLIENTE'){state.f.UNIDADE='';buildFilters();} render(); });
+  $('#filters').querySelectorAll('select,input').forEach(el=>el.onchange=()=>{ state.f[el.dataset.k]=el.value; if(el.dataset.k==='CLIENTE') state.f.UNIDADE=''; buildFilters(); render(); });
 }
 function parseQuery(q){
   const terms=[], fields={};
@@ -227,13 +327,7 @@ function parseQuery(q){
 function filtered(){
   const {terms,fields}=parseQuery(state.q);
   return rows.filter(r=>{
-    for(const [k,v] of Object.entries(state.f)){
-      if(!v) continue;
-      if(k==='_de'){ if(!(r['PROX.']>=v)) return false; continue; }
-      if(k==='_ate'){ if(!(r['PROX.'] && r['PROX.']<=v)) return false; continue; }
-      if(k==='_status'){ if(status(r)!==v) return false; continue; }
-      if(String(r[k])!==v) return false;
-    }
+    if(!matchF(r)) return false;
     for(const [k,v] of Object.entries(fields)){
       const val = k==='_status' ? norm(status(r)+' '+ST[status(r)]) : norm(r[k]);
       if(!val.includes(v)) return false;
@@ -305,7 +399,7 @@ function insightsList(d){
 }
 function renderInsights(d){ $('#insights').innerHTML = insightsList(d).map(x=>`<li>${x}</li>`).join(''); }
 Chart.defaults.color='#8b97b1'; Chart.defaults.borderColor='#24304d'; Chart.defaults.font.family='Manrope';
-function chart(id,cfgc){ charts[id]?.destroy(); charts[id]=new Chart(document.getElementById(id),cfgc); }
+function chart(id,cfgc){ charts[id]?.destroy(); cfgc.options={responsive:true,maintainAspectRatio:false,...(cfgc.options||{})}; charts[id]=new Chart(document.getElementById(id),cfgc); }
 function renderCharts(d){
   const c={vencida:0,proxima:0,emdia:0,sem:0}; d.forEach(r=>c[status(r)]++);
   chart('chStatus',{type:'doughnut',data:{labels:Object.values(ST),datasets:[{data:Object.values(c),backgroundColor:['#ef4444','#f59e0b','#22c55e','#475569'],borderWidth:0}]},options:{cutout:'68%',plugins:{legend:{position:'bottom'}}}});
