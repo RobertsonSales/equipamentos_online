@@ -238,8 +238,8 @@ a.btn,a.btn:visited{color:var(--text);text-decoration:none}   /* link 'Gerenciad
   <div class="spacer"></div>
   <div class="hd-actions">
   <a class="btn" href="https://patrimonio-ten.vercel.app/" target="_blank" rel="noopener" style="text-decoration:none" title="Gerenciador de Patrimônio (mesma planilha, somente leitura)">▦ Gerenciador</a>
-  <a class="btn" href="https://controle-de-pecas-omega.vercel.app/" target="labmedic-controle-pecas" title="Controle de Peças — entrada e saída de peças de reposição para os equipamentos das unidades (abre em outra aba)" aria-label="Peças: abrir o Controle de Peças em outra aba">⚙ Peças</a>
-  <button class="btn" onclick="reload()">↻ Atualizar</button>
+  <a class="btn" href="https://controle-de-pecas-omega.vercel.app/" target="labmedic-controle-pecas" onclick="return abrirAppVizinho(event, this.href, 'labmedic-controle-pecas')" title="Controle de Peças — entrada e saída de peças de reposição para os equipamentos das unidades (abre em outra aba)" aria-label="Peças: abrir o Controle de Peças em outra aba">⚙ Peças</a>
+  <button class="btn" onclick="reload('botao')" title="Buscar agora os dados mais recentes da planilha">↻ Atualizar</button>
   <button class="btn" onclick="openPdf()">⎙ Relatório PDF</button>
   <button class="btn primary" onclick="openForm()">＋ Novo equipamento</button>
   </div>
@@ -330,13 +330,30 @@ function demo(method,p){
   localStorage.setItem('pat_demo',JSON.stringify(db)); return p.record||{};
 }
 const busy = on => $('#loader').classList.toggle('on',on);
+
+/* ======================= CACHE LOCAL DA PLANILHA =======================
+   A última leitura do Google Sheets fica guardada neste navegador por CACHE_TTL.
+   Abrir/recarregar a aplicação dentro desse prazo (ex.: pelo botão "Patrimônio" do Controle de Peças)
+   mostra os dados guardados SEM consultar a planilha. "↻ Atualizar", salvar e excluir sempre buscam de novo. */
+const CACHE_KEY = 'pat_cache_v1', CACHE_TTL = 10 * 60 * 1000; // 10 minutos
+function lerCache(){ try{ const c=JSON.parse(localStorage.getItem(CACHE_KEY)||'null'); if(c && Array.isArray(c.rows) && Date.now()-c.at < CACHE_TTL) return c; }catch{} return null; }
+function gravarCache(list){ try{ localStorage.setItem(CACHE_KEY, JSON.stringify({at:Date.now(), rows:list})); }catch{} }
+const hhmm = t => new Date(t).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+function setBadge(live, cacheAt){
+  const m=$('#mode'); m.className='badge '+(live?'live':'demo');
+  m.textContent = !live ? 'Modo demonstração' : cacheAt ? `● Google Sheets · dados das ${hhmm(cacheAt)}` : '● Conectado ao Google Sheets';
+  m.title = cacheAt ? 'Dados reaproveitados da última leitura neste navegador (sem nova consulta à planilha). Clique em "↻ Atualizar" para buscar agora.' : '';
+}
 function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2800); }
 
-async function reload(){
+async function reload(force){
   busy(true);
-  try{ LIVE = await probe(); rows = (await api('GET')).map(r=>({...r})); const live=LIVE;
-    $('#mode').className='badge '+(live?'live':'demo'); $('#mode').textContent= live?'● Conectado ao Google Sheets':'Modo demonstração';
+  try{
+    const c = force ? null : lerCache();
+    if(c){ LIVE = true; rows = c.rows.map(r=>({...r})); setBadge(true, c.at); }              // sem consulta à planilha
+    else { LIVE = await probe(); rows = (await api('GET')).map(r=>({...r})); if(LIVE) gravarCache(rows); setBadge(LIVE, null); }
     buildFilters(); render();
+    if(force==='botao' && LIVE) toast('Dados atualizados da planilha');
   }catch(e){ toast('Erro ao carregar: '+e.message); }
   busy(false);
 }
@@ -571,11 +588,11 @@ async function saveForm(e){
   e.preventDefault(); const rec={...(current||{})}; new FormData($('#form')).forEach((v,k)=>rec[k]=String(v).trim());
   if(rec.SERIAL && rows.some(r=>r.ID!==rec.ID && String(r.SERIAL)===rec.SERIAL) && !confirm('Já existe um equipamento com este serial. Salvar mesmo assim?')) return;
   busy(true);
-  try{ await api('POST',{action:current?'update':'create',record:rec}); closeM('mForm'); toast(current?'Registro atualizado':'Registro criado'); await reload(); }
+  try{ await api('POST',{action:current?'update':'create',record:rec}); closeM('mForm'); toast(current?'Registro atualizado':'Registro criado'); await reload(true); }
   catch(err){ toast('Erro: '+err.message); } busy(false);
 }
 async function del(id){ const r=rows.find(x=>x.ID===id); if(!confirm(`Excluir ${r?.EQUIPAMENTO} (${r?.SERIAL})?`)) return;
-  busy(true); try{ await api('POST',{action:'delete',id}); closeM('mForm'); toast('Registro excluído'); await reload(); }catch(err){ toast('Erro: '+err.message); } busy(false); }
+  busy(true); try{ await api('POST',{action:'delete',id}); closeM('mForm'); toast('Registro excluído'); await reload(true); }catch(err){ toast('Erro: '+err.message); } busy(false); }
 const delCurrent = () => current && del(current.ID);
 const closeM = id => $('#'+id).classList.remove('open');
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
@@ -727,6 +744,23 @@ function downloadPdf(){ pdfDoc && pdfDoc.save(`patrimonio_${new Date().toISOStri
 reload();
 </script>
 <script>
+
+  /* Alterna para a aba da outra aplicação SEM recarregá-la quando ela já está aberta.
+     window.open('', nome) devolve a aba existente sem navegar; se ela for de outro site (a outra aplicação),
+     o navegador não deixa ler o endereço → sinal de que já está carregada → só traz para a frente.
+     Se não existir, a aba nova nasce em branco → aí sim navega para o endereço. */
+  function abrirAppVizinho(ev, url, nome) {
+    let w = null;
+    try { w = window.open('', nome); } catch (e) {}
+    if (!w) return true;                       // bloqueador de pop-up: segue o link normalmente
+    let emBranco = false;
+    try { emBranco = !w.location.href || w.location.href === 'about:blank'; } catch (e) { emBranco = false; }
+    if (emBranco) w.location.href = url;       // não havia aba aberta → carrega a aplicação
+    try { w.focus(); } catch (e) {}
+    if (ev) ev.preventDefault();
+    return false;
+  }
+
   // Nome desta aba: o botão "Patrimônio" do Controle de Peças volta para ela em vez de abrir outra
   try { window.name = 'labmedic-patrimonio'; } catch (e) {}
 </script>
