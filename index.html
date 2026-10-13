@@ -603,7 +603,7 @@ function renderTree(d){
   const g=group(d); $('#treeCount').textContent=`${Object.keys(g).length} cliente(s)`;
   $('#tree').innerHTML = Object.entries(g).map(([cli,o])=>{ const all=Object.values(o.u).flat();
     return `<details open><summary><b>${esc(cli)}</b><span class="badge mono">${[...o.cnpj].filter(Boolean).map(esc).join(' · ')}</span><div class="spacer"></div>${stSummary(all)}<span class="badge">${Object.keys(o.u).length} unid. · ${all.length} equip.</span></summary>
-    ${Object.entries(o.u).map(([u,l])=>`<details class="unit"><summary>▸ <b>${esc(u)}</b>${cnpjTag(cnpjsDaUnidade(cli,u))}<div class="spacer"></div>${stSummary(l)}<span class="badge">${l.length} equip.</span></summary><div class="eqs">
+    ${Object.entries(o.u).map(([u,l])=>`<details class="unit"><summary>▸ <b>${esc(u)}</b><div class="spacer"></div>${stSummary(l)}<span class="badge">${l.length} equip.</span></summary><div class="eqs">
       ${l.map(r=>`<div class="eq" data-id="${esc(r.ID)}"><div style="display:flex;justify-content:space-between;gap:6px"><b>${esc(r.EQUIPAMENTO)}</b>${pill(status(r))}</div><span style="color:var(--muted)">${esc(r.CATEGORIA)} · <span class="mono">${esc(r.SERIAL)}</span></span><br><span style="color:var(--muted)">Próx.: ${br(r['PROX.'])} · ${esc(r['RESPONSAVÉL']||'—')}</span></div>`).join('')}
     </div></details>`).join('')}</details>`; }).join('') || '<div class="card">Nenhum resultado.</div>';
   $('#tree').querySelectorAll('.eq').forEach(el=>el.onclick=()=>openForm(rows.find(r=>r.ID===el.dataset.id)));
