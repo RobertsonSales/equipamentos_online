@@ -35,9 +35,14 @@ header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:16px
 .btn.sm{padding:6px 9px;font-size:12px}
 main{padding:24px 28px 60px;max-width:1500px;margin:0 auto}
 .search{position:relative;flex:1;min-width:320px;max-width:560px}
-.search input{width:100%;padding:11px 14px 11px 40px;border-radius:12px;border:1px solid var(--line);background:var(--panel);outline:none}
+.search input{width:100%;padding:11px 40px 11px 40px;border-radius:12px;border:1px solid var(--line);background:var(--panel);outline:none}
 .search input:focus{border-color:var(--brand)}
-.search span{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted)}
+.search>span{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted)}   /* só a lupa (antes pegava também os textos das sugestões) */
+.search-clear{position:absolute;right:7px;top:50%;transform:translateY(-50%);width:28px;height:28px;border-radius:50%;border:0;background:var(--panel2);color:var(--text);font-size:13px;font-weight:700;line-height:1;cursor:pointer;display:grid;place-items:center}
+.search-clear[hidden]{display:none}
+.search-clear:hover{background:var(--brand);color:#04131a}
+.search-clear:focus-visible{outline:2px solid var(--brand2);outline-offset:2px}
+.search input::-webkit-search-cancel-button{display:none}
 .suggest{position:absolute;left:0;right:0;top:110%;background:var(--panel2);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);display:none;max-height:320px;overflow:auto}
 .suggest div{padding:9px 14px;cursor:pointer;display:flex;justify-content:space-between;gap:10px;font-size:14px}
 .suggest div:hover,.suggest div.act{background:#ffffff0d}
@@ -238,6 +243,7 @@ a.btn,a.btn:visited{color:var(--text);text-decoration:none}   /* link 'Gerenciad
   <div class="search">
     <span>⌕</span>
     <input id="q" autocomplete="off" placeholder="Busca inteligente: equipamento, serial, cliente… ou  responsavel:felipe  status:vencida" />
+    <button type="button" id="qClear" class="search-clear" title="Limpar a busca (Esc)" aria-label="Limpar a busca" hidden>✕</button>
     <div id="suggest" class="suggest"></div>
   </div>
   <div class="spacer"></div>
@@ -511,13 +517,20 @@ function chips(){
   if(state.q) c.push(['q',`Busca: “${state.q}”`]);
   activeFilters().forEach(([k,l,t])=>c.push([k,`${l}: ${t.length>60?t.slice(0,57)+'…':t}`]));
   $('#chips').innerHTML = c.map(([k,l])=>`<span class="chip" data-k="${k}">${esc(l)} ✕</span>`).join('') + (c.length?`<span class="chip" data-k="*">Limpar tudo</span>`:'');
-  $('#chips').querySelectorAll('.chip').forEach(el=>el.onclick=()=>{ const k=el.dataset.k; if(k==='*'){state.f={CATEGORIA:[]};state.q='';} else if(k==='q') state.q=''; else if(k==='CATEGORIA') state.f.CATEGORIA=[]; else delete state.f[k]; $('#q').value=state.q; buildFilters(); render(); });
+  $('#chips').querySelectorAll('.chip').forEach(el=>el.onclick=()=>{ const k=el.dataset.k; if(k==='*'){state.f={};state.q='';ultimoPadraoCat=null;aplicarPadraoCategoria();} else if(k==='q') state.q=''; else if(k==='CATEGORIA') state.f.CATEGORIA=[]; else delete state.f[k]; $('#q').value=state.q; qClear.hidden=!state.q; buildFilters(); render(); });
 }
 
 /* Sugestões da busca */
 const q=$('#q'), sg=$('#suggest'); let sIdx=-1;
-q.addEventListener('input',()=>{ state.q=q.value; render(); suggest(); });
-q.addEventListener('keydown',e=>{ const it=[...sg.children]; if(!it.length) return;
+const qClear=$('#qClear');
+const syncQClear=()=>{ qClear.hidden=!q.value; };
+/* Limpa SÓ a busca (os filtros, inclusive as categorias desmarcadas, continuam como estão) */
+function limparBusca(){ q.value=''; state.q=''; sg.style.display='none'; syncQClear(); render(); q.focus(); }
+qClear.addEventListener('click',limparBusca);
+q.addEventListener('input',()=>{ state.q=q.value; syncQClear(); render(); suggest(); });
+q.addEventListener('keydown',e=>{ const it=[...sg.children];
+  if(e.key==='Escape' && (sg.style.display==='none' || !it.length) && q.value){ e.preventDefault(); limparBusca(); return; } // Esc com a lista fechada = limpar
+  if(!it.length) return;
   if(e.key==='ArrowDown'){sIdx=Math.min(sIdx+1,it.length-1);} else if(e.key==='ArrowUp'){sIdx=Math.max(sIdx-1,0);} else if(e.key==='Enter'&&sIdx>=0){it[sIdx].click();e.preventDefault();return;} else if(e.key==='Escape'){sg.style.display='none';return;} else return;
   it.forEach((x,i)=>x.classList.toggle('act',i===sIdx)); e.preventDefault(); });
 q.addEventListener('blur',()=>setTimeout(()=>sg.style.display='none',150));
@@ -529,7 +542,7 @@ function suggest(){
     uniq(k).forEach(v=>{ if(norm(v).includes(last)) out.push([a,v]); }));
   sg.innerHTML = out.slice(0,10).map(([a,v])=>`<div data-v='${a}:"${esc(v)}"'><span>${esc(v)}</span><small>${a}</small></div>`).join('');
   sg.style.display = out.length?'block':'none';
-  [...sg.children].forEach(d=>d.onclick=()=>{ const parts=q.value.split(/\s+/); parts.pop(); parts.push(d.dataset.v); q.value=parts.join(' ').trim()+' '; state.q=q.value.trim(); sg.style.display='none'; q.focus(); render(); });
+  [...sg.children].forEach(d=>d.onclick=()=>{ const parts=q.value.split(/\s+/); parts.pop(); parts.push(d.dataset.v); q.value=parts.join(' ').trim()+' '; state.q=q.value.trim(); sg.style.display='none'; syncQClear(); q.focus(); render(); });
 }
 
 /* ======================= RENDER ======================= */
