@@ -224,6 +224,11 @@ a.btn,a.btn:visited{color:var(--text);text-decoration:none}   /* link 'Gerenciad
   .fdd-item{padding:10px 4px;font-size:15px!important}
   .fdd-panel input[type=checkbox]{flex-basis:22px;width:22px;height:22px}
 }
+/* CNPJ junto ao nome da unidade */
+.cnpj-tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11.5px;font-weight:600;color:var(--muted);border:1px solid var(--line);background:var(--panel2);white-space:nowrap;vertical-align:middle}
+.cnpj-tag.cnpj-sem{font-style:italic;opacity:.8}
+.cnpj-sub{display:block;font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap}
+@media (max-width:600px){ .unit>summary{flex-wrap:wrap} }
 </style>
 </head>
 <body>
@@ -352,6 +357,7 @@ async function reload(force){
     const c = force ? null : lerCache();
     if(c){ LIVE = true; rows = c.rows.map(r=>({...r})); setBadge(true, c.at); }              // sem consulta à planilha
     else { LIVE = await probe(); rows = (await api('GET')).map(r=>({...r})); if(LIVE) gravarCache(rows); setBadge(LIVE, null); }
+    aplicarPadraoCategoria();
     buildFilters(); render();
     if(force==='botao' && LIVE) toast('Dados atualizados da planilha');
   }catch(e){ toast('Erro ao carregar: '+e.message); }
@@ -386,10 +392,32 @@ function optionsFor(k){
 /* Lista de filtros ativos (usada nos chips, no Excel e no PDF) */
 function activeFilters(){
   const L=[];
-  FILTERS.forEach(([k,l])=>{ const a=sel(k); if(a.length) L.push([k,l,a.map(v=>optText(k,v)).join(', ')]); });
+  FILTERS.forEach(([k,l])=>{ const a=sel(k); if(a.length) L.push([k,l, a.length>1 && rotuloSel(k,a).startsWith('Todas exceto') ? rotuloSel(k,a) : a.map(v=>optText(k,v)).join(', ')]); });
   if(state.f._de) L.push(['_de','Próx. preventiva de',br(state.f._de)]);
   if(state.f._ate) L.push(['_ate','Próx. preventiva até',br(state.f._ate)]);
   return L;
+}
+/* Categorias que começam DESMARCADAS (todas as demais vêm marcadas). Comparação sem acento/maiúscula. */
+const CAT_OCULTAS = ['auxiliar','impressora','periferico'];
+const catOculta = v => CAT_OCULTAS.some(c => norm(v).startsWith(c));
+let ultimoPadraoCat = null; // seleção-padrão aplicada pela última vez (para saber se o operador mexeu)
+function aplicarPadraoCategoria(){
+  const atual = state.f.CATEGORIA;
+  const mexeu = atual !== undefined && JSON.stringify(sel('CATEGORIA')) !== ultimoPadraoCat;
+  if(mexeu) return;                                   // operador já escolheu: respeita
+  const todas = uniq('CATEGORIA'), visiveis = todas.filter(v => !catOculta(v));
+  if(visiveis.length === todas.length){ state.f.CATEGORIA = []; ultimoPadraoCat = '[]'; return; } // nada a ocultar
+  state.f.CATEGORIA = visiveis; ultimoPadraoCat = JSON.stringify(visiveis);
+}
+/* Rótulo curto quando quase tudo está marcado: "Todas exceto …" */
+function rotuloSel(k, chosen){
+  if(!chosen.length) return 'Todos';
+  if(chosen.length === 1) return optText(k, chosen[0]);
+  if(k === 'CATEGORIA'){
+    const fora = uniq('CATEGORIA').filter(v => !chosen.includes(v));
+    if(fora.length && fora.length < chosen.length) return 'Todas exceto ' + fora.map(v => optText(k, v)).join(', ');
+  }
+  return `${chosen.length} selecionados`;
 }
 function setSel(k, arr){ state.f[k]=[...new Set(arr)]; if(k==='CLIENTE') state.f.UNIDADE=[]; }
 
@@ -442,7 +470,7 @@ function buildFilters(){
     list.innerHTML = opts.length ? opts.map(([v,n])=>`<label class="fdd-item${n===0?' out':''}"><input type="checkbox" value="${esc(v)}" ${chosen.includes(v)?'checked':''}><span class="fdd-v">${esc(optText(k,v))}</span><small>${n}</small></label>`).join('')
       : '<div class="fdd-empty">Nenhuma opção com os filtros atuais.</div>';
     list.scrollTop=top;
-    const txt = !chosen.length ? 'Todos' : chosen.length===1 ? optText(k,chosen[0]) : `${chosen.length} selecionados`;
+    const txt = rotuloSel(k, chosen);
     dd.querySelector('.fdd-txt').textContent=txt; dd.querySelector('.fdd-btn').title=chosen.map(v=>optText(k,v)).join(', ')||'Todos';
     dd.classList.toggle('active', chosen.length>0);
     applyFddSearch(dd);
@@ -483,7 +511,7 @@ function chips(){
   if(state.q) c.push(['q',`Busca: “${state.q}”`]);
   activeFilters().forEach(([k,l,t])=>c.push([k,`${l}: ${t.length>60?t.slice(0,57)+'…':t}`]));
   $('#chips').innerHTML = c.map(([k,l])=>`<span class="chip" data-k="${k}">${esc(l)} ✕</span>`).join('') + (c.length?`<span class="chip" data-k="*">Limpar tudo</span>`:'');
-  $('#chips').querySelectorAll('.chip').forEach(el=>el.onclick=()=>{ const k=el.dataset.k; if(k==='*'){state.f={};state.q='';} else if(k==='q') state.q=''; else delete state.f[k]; $('#q').value=state.q; buildFilters(); render(); });
+  $('#chips').querySelectorAll('.chip').forEach(el=>el.onclick=()=>{ const k=el.dataset.k; if(k==='*'){state.f={CATEGORIA:[]};state.q='';} else if(k==='q') state.q=''; else if(k==='CATEGORIA') state.f.CATEGORIA=[]; else delete state.f[k]; $('#q').value=state.q; buildFilters(); render(); });
 }
 
 /* Sugestões da busca */
@@ -527,7 +555,7 @@ function renderKpis(d){
 function insightsList(d){
   const L=[]; if(!d.length) return ['Nenhum registro no cenário atual.'];
   const venc=d.filter(r=>status(r)==='vencida').sort((a,b)=>days(a['PROX.'])-days(b['PROX.']));
-  if(venc.length) L.push(`<b>${venc.length}</b> preventiva(s) vencida(s). Mais crítica: <b>${esc(venc[0].EQUIPAMENTO)}</b> (${esc(venc[0].UNIDADE)}) há ${-days(venc[0]['PROX.'])} dias.`);
+  if(venc.length) L.push(`<b>${venc.length}</b> preventiva(s) vencida(s). Mais crítica: <b>${esc(venc[0].EQUIPAMENTO)}</b> (${esc(venc[0].UNIDADE)}${venc[0].CNPJ?` · CNPJ ${esc(venc[0].CNPJ)}`:''}) há ${-days(venc[0]['PROX.'])} dias.`);
   const next=d.filter(r=>r['PROX.']&&days(r['PROX.'])>=0).sort((a,b)=>days(a['PROX.'])-days(b['PROX.']))[0];
   if(next) L.push(`Próxima preventiva: <b>${esc(next.EQUIPAMENTO)}</b> em ${br(next['PROX.'])} (${days(next['PROX.'])} dias) — ${esc(next['RESPONSAVÉL']||'sem responsável')}.`);
   const resp={}; d.forEach(r=>{const k=r['RESPONSAVÉL']||'Sem responsável'; resp[k]=(resp[k]||0)+1;});
@@ -553,13 +581,16 @@ function renderCharts(d){
   const rs={}; d.forEach(r=>{const k=r['RESPONSAVÉL']||'—'; rs[k]=(rs[k]||0)+1;});
   chart('chResp',{type:'polarArea',data:{labels:Object.keys(rs),datasets:[{data:Object.values(rs),backgroundColor:['#14b8a6aa','#0ea5e9aa','#6366f1aa','#f59e0baa','#22c55eaa','#ef4444aa']}]},options:{plugins:{legend:{position:'bottom'}},scales:{r:{ticks:{display:false}}}}});
 }
+/* CNPJ(s) do cliente vinculado à unidade (a partir dos equipamentos dela) */
+function cnpjsDaUnidade(cli, uni, base){ return [...new Set((base||rows).filter(r=>(r.CLIENTE||'—')===cli && (r.UNIDADE||'—')===uni).map(r=>String(r.CNPJ||'').trim()).filter(Boolean))]; }
+const cnpjTag = l => l.length ? `<span class="cnpj-tag mono" title="CNPJ do cliente vinculado à unidade">CNPJ ${l.map(esc).join(' · ')}</span>` : `<span class="cnpj-tag cnpj-sem" title="Nenhum CNPJ informado para esta unidade">CNPJ não informado</span>`;
 function group(d){ const g={}; d.forEach(r=>{ (g[r.CLIENTE||'—']??={cnpj:new Set(),u:{}}); g[r.CLIENTE||'—'].cnpj.add(r.CNPJ); (g[r.CLIENTE||'—'].u[r.UNIDADE||'—']??=[]).push(r); }); return g; }
 function stSummary(list){ const c={vencida:0,proxima:0}; list.forEach(r=>{const s=status(r); if(c[s]!=null)c[s]++;}); return (c.vencida?`<span class="pill st-vencida">${c.vencida} vencida(s)</span>`:'')+(c.proxima?`<span class="pill st-proxima">${c.proxima} em 30d</span>`:'')+(!c.vencida&&!c.proxima?'<span class="pill st-emdia">OK</span>':''); }
 function renderTree(d){
   const g=group(d); $('#treeCount').textContent=`${Object.keys(g).length} cliente(s)`;
   $('#tree').innerHTML = Object.entries(g).map(([cli,o])=>{ const all=Object.values(o.u).flat();
     return `<details open><summary><b>${esc(cli)}</b><span class="badge mono">${[...o.cnpj].filter(Boolean).map(esc).join(' · ')}</span><div class="spacer"></div>${stSummary(all)}<span class="badge">${Object.keys(o.u).length} unid. · ${all.length} equip.</span></summary>
-    ${Object.entries(o.u).map(([u,l])=>`<details class="unit"><summary>▸ <b>${esc(u)}</b><div class="spacer"></div>${stSummary(l)}<span class="badge">${l.length} equip.</span></summary><div class="eqs">
+    ${Object.entries(o.u).map(([u,l])=>`<details class="unit"><summary>▸ <b>${esc(u)}</b>${cnpjTag(cnpjsDaUnidade(cli,u))}<div class="spacer"></div>${stSummary(l)}<span class="badge">${l.length} equip.</span></summary><div class="eqs">
       ${l.map(r=>`<div class="eq" data-id="${esc(r.ID)}"><div style="display:flex;justify-content:space-between;gap:6px"><b>${esc(r.EQUIPAMENTO)}</b>${pill(status(r))}</div><span style="color:var(--muted)">${esc(r.CATEGORIA)} · <span class="mono">${esc(r.SERIAL)}</span></span><br><span style="color:var(--muted)">Próx.: ${br(r['PROX.'])} · ${esc(r['RESPONSAVÉL']||'—')}</span></div>`).join('')}
     </div></details>`).join('')}</details>`; }).join('') || '<div class="card">Nenhum resultado.</div>';
   $('#tree').querySelectorAll('.eq').forEach(el=>el.onclick=()=>openForm(rows.find(r=>r.ID===el.dataset.id)));
@@ -568,7 +599,7 @@ function sorted(d){ const {k,d:dir}=state.sort; return [...d].sort((a,b)=>String
 function renderTable(d){
   $('#rowCount').textContent=`${d.length} de ${rows.length}`;
   $('#table').innerHTML = `<thead><tr>${TABLE_COLS.map(c=>`<th data-k="${c}">${c}${state.sort.k===c?(state.sort.d>0?' ↑':' ↓'):''}</th>`).join('')}<th>Status</th><th></th></tr></thead><tbody>
-  ${sorted(d).map(r=>`<tr>${TABLE_COLS.map(c=>`<td class="${['SERIAL','CD PAT'].includes(c)?'mono':''}">${DATE_COLS.includes(c)?br(r[c]):esc(r[c]||'—')}</td>`).join('')}<td>${pill(status(r))}</td><td><button class="btn sm" data-e="${esc(r.ID)}">Editar</button> <button class="btn sm danger" data-d="${esc(r.ID)}">✕</button></td></tr>`).join('')}</tbody>`;
+  ${sorted(d).map(r=>`<tr>${TABLE_COLS.map(c=>`<td class="${['SERIAL','CD PAT'].includes(c)?'mono':''}">${DATE_COLS.includes(c)?br(r[c]):c==='UNIDADE'?`${esc(r[c]||'—')}${r.CNPJ?`<small class="cnpj-sub mono">CNPJ ${esc(r.CNPJ)}</small>`:''}`:esc(r[c]||'—')}</td>`).join('')}<td>${pill(status(r))}</td><td><button class="btn sm" data-e="${esc(r.ID)}">Editar</button> <button class="btn sm danger" data-d="${esc(r.ID)}">✕</button></td></tr>`).join('')}</tbody>`;
   $('#table').querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{ state.sort={k:th.dataset.k,d:state.sort.k===th.dataset.k?-state.sort.d:1}; render(); });
   $('#table').querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>openForm(rows.find(r=>r.ID===b.dataset.e)));
   $('#table').querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>del(b.dataset.d));
