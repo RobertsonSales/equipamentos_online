@@ -320,6 +320,19 @@ const pd = s => { if(!s) return null; const m=String(s).match(/^(\d{4})-(\d{2})-
 const br = s => { const d=pd(s); return d? d.toLocaleDateString('pt-BR') : '—'; };
 const days = s => { const d=pd(s); return d? Math.round((d-today)/864e5) : null; };
 function status(r){ const n=days(r['PROX.']); if(n===null) return 'sem'; if(n<0) return 'vencida'; if(n<=30) return 'proxima'; return 'emdia'; }
+/* Regra de PROX. (a mesma do Apps Script — PRAZO_POR_PREFIXO; se mudar lá, mude aqui):
+   PREV. ATUAL + 180d (Gasometria, Urinálise, Eletrólitos, Deionizador), +365d (prefixo "HEMO": Hemoglobina e
+   Hemocultura), +360d para as demais (inclusive Hematologia, prefixo "HEMA"). Sem PREV. ATUAL → sem PROX.
+   Aqui serve para o cálculo imediato no modal; o valor oficial vem do Apps Script. */
+const fmtISO = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+function calcProx(categoria, prev){
+  const d = pd(prev); if(!d) return '';
+  const c = norm(categoria).slice(0,4);
+  const n = ['gaso','urin','elet','deio'].includes(c) ? 180 : c==='hemo' ? 365 : 360;
+  d.setDate(d.getDate()+n); return fmtISO(d);
+}
+/* PROX. é sempre DERIVADA de PREV. ATUAL + CATEGORIA (ignora o valor lido da planilha, que hoje vem errado) */
+const normalizar = list => list.map(r => ({...r, 'PROX.': calcProx(r.CATEGORIA, r['PREV. ATUAL'])}));
 const pill = st => `<span class="pill st-${st}">${ST[st]}</span>`;
 
 /* ======================= API ======================= */
@@ -364,8 +377,8 @@ async function reload(force){
   busy(true);
   try{
     const c = force ? null : lerCache();
-    if(c){ LIVE = true; rows = c.rows.map(r=>({...r})); setBadge(true, c.at); }              // sem consulta à planilha
-    else { LIVE = await probe(); rows = (await api('GET')).map(r=>({...r})); if(LIVE) gravarCache(rows); setBadge(LIVE, null); }
+    if(c){ LIVE = true; rows = normalizar(c.rows); setBadge(true, c.at); }              // sem consulta à planilha
+    else { LIVE = await probe(); rows = normalizar(await api('GET')); if(LIVE) gravarCache(rows); setBadge(LIVE, null); }
     aplicarPadraoCategoria();
     buildFilters(); render();
     if(force==='botao' && LIVE) toast('Dados atualizados da planilha');
@@ -609,7 +622,13 @@ function renderCharts(d){
 function cnpjsDaUnidade(cli, uni, base){ return [...new Set((base||rows).filter(r=>(r.CLIENTE||'—')===cli && (r.UNIDADE||'—')===uni).map(r=>String(r.CNPJ||'').trim()).filter(Boolean))]; }
 const cnpjTag = l => l.length ? `<span class="cnpj-tag mono" title="CNPJ do cliente vinculado à unidade">CNPJ ${l.map(esc).join(' · ')}</span>` : `<span class="cnpj-tag cnpj-sem" title="Nenhum CNPJ informado para esta unidade">CNPJ não informado</span>`;
 function group(d){ const g={}; d.forEach(r=>{ (g[r.CLIENTE||'—']??={cnpj:new Set(),u:{}}); g[r.CLIENTE||'—'].cnpj.add(r.CNPJ); (g[r.CLIENTE||'—'].u[r.UNIDADE||'—']??=[]).push(r); }); return g; }
-function stSummary(list){ const c={vencida:0,proxima:0}; list.forEach(r=>{const s=status(r); if(c[s]!=null)c[s]++;}); return (c.vencida?`<span class="pill st-vencida">${c.vencida} vencida(s)</span>`:'')+(c.proxima?`<span class="pill st-proxima">${c.proxima} em 30d</span>`:'')+(!c.vencida&&!c.proxima?'<span class="pill st-emdia">OK</span>':''); }
+function stSummary(list){
+  const c={vencida:0,proxima:0,emdia:0,sem:0}; list.forEach(r=>c[status(r)]++);
+  const P=(cls,t)=>`<span class="pill st-${cls}">${t}</span>`;
+  if(list.length && c.emdia===list.length) return P('emdia','OK');          // OK só quando TODOS estão em dia
+  return (c.vencida?P('vencida',`${c.vencida} vencida(s)`):'')+(c.proxima?P('proxima',`${c.proxima} em 30d`):'')
+        +(c.emdia?P('emdia',`${c.emdia} em dia`):'')+(c.sem?P('sem',`${c.sem} sem data`):'');
+}
 function renderTree(d){
   const g=group(d); $('#treeCount').textContent=`${Object.keys(g).length} cliente(s)`;
   $('#tree').innerHTML = Object.entries(g).map(([cli,o])=>{ const all=Object.values(o.u).flat();
@@ -634,16 +653,31 @@ function openForm(r){
   const base = r || {CLIENTE:single('CLIENTE'),UNIDADE:single('UNIDADE'),REGIÃO:single('REGIÃO')};
   $('#fBody').innerHTML = COLS.map(c=>`<div class="field"><label>${c}</label><input name="${c}" ${DATE_COLS.includes(c)?'type="date"':''} list="dl-${norm(c).replace(/\W/g,'')}" value="${esc(base[c]??'')}" ${['CLIENTE','UNIDADE','EQUIPAMENTO'].includes(c)?'required':''}></div>`).join('')
     + ["CLIENTE","UNIDADE","CATEGORIA","RESPONSAVÉL","REGIÃO","EQUIPAMENTO"].map(c=>`<datalist id="dl-${norm(c).replace(/\W/g,'')}">${uniq(c).map(v=>`<option value="${esc(v)}">`).join('')}</datalist>`).join('');
-  const prev=$('#fBody [name="PREV. ATUAL"]'), prox=$('#fBody [name="PROX."]');
-  prev.addEventListener('change',()=>{ if(prev.value && !prox.value){ const d=pd(prev.value); d.setDate(d.getDate()+180); prox.value=d.toISOString().slice(0,10); toast('Próxima preventiva sugerida: +180 dias'); }});
+  const prev=$('#fBody [name="PREV. ATUAL"]'), prox=$('#fBody [name="PROX."]'), cat=$('#fBody [name="CATEGORIA"]');
+  prox.readOnly=true; prox.tabIndex=-1; prox.title='Calculada automaticamente a partir da preventiva atual e da categoria (regra da planilha)';
+  prox.style.opacity='.8'; prox.style.cursor='not-allowed';
+  const recalc=()=>{ prox.value = calcProx(cat.value, prev.value); };
+  ['input','change'].forEach(ev=>{ prev.addEventListener(ev,recalc); cat.addEventListener(ev,recalc); });
+  recalc();
   $('#mForm').classList.add('open');
 }
 async function saveForm(e){
   e.preventDefault(); const rec={...(current||{})}; new FormData($('#form')).forEach((v,k)=>rec[k]=String(v).trim());
   if(rec.SERIAL && rows.some(r=>r.ID!==rec.ID && String(r.SERIAL)===rec.SERIAL) && !confirm('Já existe um equipamento com este serial. Salvar mesmo assim?')) return;
+  rec['PROX.'] = calcProx(rec.CATEGORIA, rec['PREV. ATUAL']);        // valor local (exibição)
+  const payload = {...rec}; delete payload['PROX.'];                  // NÃO envia: a coluna PROX. é fórmula na planilha
   busy(true);
-  try{ await api('POST',{action:current?'update':'create',record:rec}); closeM('mForm'); toast(current?'Registro atualizado':'Registro criado'); await reload(true); }
-  catch(err){ toast('Erro: '+err.message); } busy(false);
+  try{
+    const saved = await api('POST',{action:current?'update':'create',record:payload});
+    closeM('mForm');
+    if(current){                                                      // atualiza só este registro na memória
+      const i = rows.findIndex(r=>r.ID===current.ID); if(i>=0) rows[i] = {...rows[i], ...rec, ...(saved && typeof saved==='object' ? saved : {})};
+    } else if(saved && saved.ID){ rows.push({...rec, ...saved}); }
+    else { toast('Registro criado'); await reload(true); busy(false); return; }   // sem ID de retorno: recarrega
+    if(LIVE) gravarCache(rows);
+    buildFilters(); render(); toast(current?'Registro atualizado':'Registro criado');
+  }catch(err){ toast('Erro: '+err.message); }
+  busy(false);
 }
 const closeM = id => $('#'+id).classList.remove('open');
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
