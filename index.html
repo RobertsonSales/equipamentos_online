@@ -55,6 +55,8 @@ main{padding:24px 28px 60px;max-width:1500px;margin:0 auto}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
 .kpi{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;position:relative;overflow:hidden;cursor:pointer;transition:.15s}
 .kpi:hover{border-color:var(--brand)}
+.kpi.active{border-color:var(--brand);box-shadow:0 0 0 2px #14b8a633 inset}
+.kpi:focus-visible{outline:2px solid var(--brand2);outline-offset:2px}
 .kpi::after{content:"";position:absolute;inset:auto -30px -30px auto;width:90px;height:90px;border-radius:50%;background:var(--c,var(--brand));opacity:.12}
 .kpi .l{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
 .kpi .v{font-size:32px;font-weight:800;letter-spacing:-.03em;margin-top:6px}
@@ -382,9 +384,11 @@ const sel = k => { const v=state.f[k]; return Array.isArray(v) ? v : (v ? [Strin
 const single = k => { const a=sel(k); return a.length===1 ? a[0] : ''; };
 const valOf = (r,k) => k==='_status' ? status(r) : String(r[k] ?? '');
 const optText = (k,v) => k==='_status' ? ST[v] : v;
+const isProprio = r => norm(r['CD PAT']) === 'proprio';
 /* Registro atende aos filtros ativos (opcionalmente ignorando um deles) */
 function matchF(r, skip){
   for(const [k] of FILTERS){ if(k===skip) continue; const a=sel(k); if(a.length && !a.includes(valOf(r,k))) return false; }
+  if(state.f._proprio && !isProprio(r)) return false;
   if(skip!=='_de' && state.f._de && !(r['PROX.']>=state.f._de)) return false;
   if(skip!=='_ate' && state.f._ate && !(r['PROX.'] && r['PROX.']<=state.f._ate)) return false;
   return true;
@@ -399,6 +403,7 @@ function optionsFor(k){
 /* Lista de filtros ativos (usada nos chips, no Excel e no PDF) */
 function activeFilters(){
   const L=[];
+  if(state.f._proprio) L.push(['_proprio','Patrimônio','Próprios']);
   FILTERS.forEach(([k,l])=>{ const a=sel(k); if(a.length) L.push([k,l, a.length>1 && rotuloSel(k,a).startsWith('Todas exceto') ? rotuloSel(k,a) : a.map(v=>optText(k,v)).join(', ')]); });
   if(state.f._de) L.push(['_de','Próx. preventiva de',br(state.f._de)]);
   if(state.f._ate) L.push(['_ate','Próx. preventiva até',br(state.f._ate)]);
@@ -555,16 +560,21 @@ function renderKpis(d){
   const c={vencida:0,proxima:0,emdia:0,sem:0}; d.forEach(r=>c[status(r)]++);
   const n=d.length||1, conf=Math.round((c.emdia+c.proxima)/n*100);
   const clientes=new Set(d.map(r=>r.CLIENTE)).size, unid=new Set(d.map(r=>r.CLIENTE+'|'+r.UNIDADE)).size, cats=new Set(d.map(r=>r.CATEGORIA)).size;
+  const proprios=d.filter(isProprio).length, proprioAtivo=!!state.f._proprio;
   const K=[
     ['Equipamentos',d.length,`${cats} categorias`,'var(--brand)',100,null],
     ['Clientes · Unidades',`${clientes} · ${unid}`,`${(d.length/(unid||1)).toFixed(1)} equip./unidade`,'var(--brand2)',100,null],
+    ['Próprios',proprios,'equipamentos de clientes/unidades','var(--info)',proprios/(d.length||1)*100,'_proprio'],
     ['Conformidade',conf+'%','preventivas dentro do prazo',conf>=90?'var(--ok)':conf>=70?'var(--warn)':'var(--bad)',conf,null],
     ['Vencidas',c.vencida,'ação imediata','var(--bad)',c.vencida/n*100,'vencida'],
     ['Vencem em 30 dias',c.proxima,'planejar visitas','var(--warn)',c.proxima/n*100,'proxima'],
     ['Em dia',c.emdia,'próxima > 30 dias','var(--ok)',c.emdia/n*100,'emdia'],
   ];
-  $('#kpis').innerHTML = K.map(([l,v,s,col,p,st])=>`<div class="kpi" style="--c:${col}" ${st?`data-st="${st}"`:''}><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div><div class="bar"><b style="width:${Math.min(100,p)}%"></b></div></div>`).join('');
+  $('#kpis').innerHTML = K.map(([l,v,s,col,p,st])=>`<div class="kpi${st==='_proprio'&&proprioAtivo?' active':''}" style="--c:${col}" ${st&&st!=='_proprio'?`data-st="${st}"`:''}${st==='_proprio'?` data-own="1" role="button" tabindex="0" aria-pressed="${proprioAtivo}" title="${proprioAtivo?'Mostrar todos os equipamentos':'Mostrar apenas os equipamentos próprios'}"`:''}><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div><div class="bar"><b style="width:${Math.min(100,p)}%"></b></div></div>`).join('');
   $('#kpis').querySelectorAll('[data-st]').forEach(el=>el.onclick=()=>{ state.f._status = (single('_status')===el.dataset.st && sel('_status').length===1) ? [] : [el.dataset.st]; buildFilters(); render(); });
+  const own=$('#kpis [data-own]');
+  const toggleProprio=()=>{ state.f._proprio=!state.f._proprio; buildFilters(); render(); };
+  if(own){ own.onclick=toggleProprio; own.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); toggleProprio(); } }; }
 }
 function insightsList(d){
   const L=[]; if(!d.length) return ['Nenhum registro no cenário atual.'];
