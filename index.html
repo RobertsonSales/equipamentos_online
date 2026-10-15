@@ -286,7 +286,7 @@ a.btn,a.btn:visited{color:var(--text);text-decoration:none}   /* link 'Gerenciad
 <div class="modal" id="mForm"><div class="box">
   <div class="hd"><h3 id="fTitle" style="margin:0">Equipamento</h3><div class="spacer"></div><button class="btn sm" onclick="closeM('mForm')">✕</button></div>
   <form id="form" onsubmit="saveForm(event)"><div class="bd" id="fBody"></div>
-  <div class="ft"><button type="button" class="btn danger" id="fDel" onclick="delCurrent()">Excluir</button><div class="spacer"></div><button type="button" class="btn" onclick="closeM('mForm')">Cancelar</button><button class="btn primary">Salvar</button></div></form>
+  <div class="ft"><div class="spacer"></div><button type="button" class="btn" onclick="closeM('mForm')">Cancelar</button><button class="btn primary">Salvar</button></div></form>
 </div></div>
 
 <!-- PDF -->
@@ -348,7 +348,7 @@ const busy = on => $('#loader').classList.toggle('on',on);
 /* ======================= CACHE LOCAL DA PLANILHA =======================
    A última leitura do Google Sheets fica guardada neste navegador por CACHE_TTL.
    Abrir/recarregar a aplicação dentro desse prazo (ex.: pelo botão "Patrimônio" do Controle de Peças)
-   mostra os dados guardados SEM consultar a planilha. "↻ Atualizar", salvar e excluir sempre buscam de novo. */
+   mostra os dados guardados SEM consultar a planilha. "↻ Atualizar" e salvar sempre buscam de novo. */
 const CACHE_KEY = 'pat_cache_v1', CACHE_TTL = 10 * 60 * 1000; // 10 minutos
 function lerCache(){ try{ const c=JSON.parse(localStorage.getItem(CACHE_KEY)||'null'); if(c && Array.isArray(c.rows) && Date.now()-c.at < CACHE_TTL) return c; }catch{} return null; }
 function gravarCache(list){ try{ localStorage.setItem(CACHE_KEY, JSON.stringify({at:Date.now(), rows:list})); }catch{} }
@@ -623,15 +623,14 @@ function sorted(d){ const {k,d:dir}=state.sort; return [...d].sort((a,b)=>String
 function renderTable(d){
   $('#rowCount').textContent=`${d.length} de ${rows.length}`;
   $('#table').innerHTML = `<thead><tr>${TABLE_COLS.map(c=>`<th data-k="${c}">${c}${state.sort.k===c?(state.sort.d>0?' ↑':' ↓'):''}</th>`).join('')}<th>Status</th><th></th></tr></thead><tbody>
-  ${sorted(d).map(r=>`<tr>${TABLE_COLS.map(c=>`<td class="${['SERIAL','CD PAT'].includes(c)?'mono':''}">${DATE_COLS.includes(c)?br(r[c]):c==='UNIDADE'?`${esc(r[c]||'—')}${r.CNPJ?`<small class="cnpj-sub mono">CNPJ ${esc(r.CNPJ)}</small>`:''}`:esc(r[c]||'—')}</td>`).join('')}<td>${pill(status(r))}</td><td><button class="btn sm" data-e="${esc(r.ID)}">Editar</button> <button class="btn sm danger" data-d="${esc(r.ID)}">✕</button></td></tr>`).join('')}</tbody>`;
+  ${sorted(d).map(r=>`<tr>${TABLE_COLS.map(c=>`<td class="${['SERIAL','CD PAT'].includes(c)?'mono':''}">${DATE_COLS.includes(c)?br(r[c]):c==='UNIDADE'?`${esc(r[c]||'—')}${r.CNPJ?`<small class="cnpj-sub mono">CNPJ ${esc(r.CNPJ)}</small>`:''}`:esc(r[c]||'—')}</td>`).join('')}<td>${pill(status(r))}</td><td><button class="btn sm" data-e="${esc(r.ID)}">Editar</button></td></tr>`).join('')}</tbody>`;
   $('#table').querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{ state.sort={k:th.dataset.k,d:state.sort.k===th.dataset.k?-state.sort.d:1}; render(); });
   $('#table').querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>openForm(rows.find(r=>r.ID===b.dataset.e)));
-  $('#table').querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>del(b.dataset.d));
 }
 
 /* ======================= CRUD ======================= */
 function openForm(r){
-  current = r||null; $('#fTitle').textContent = r?`Editar · ${r.EQUIPAMENTO}`:'Novo equipamento'; $('#fDel').style.display=r?'':'none';
+  current = r||null; $('#fTitle').textContent = r?`Editar · ${r.EQUIPAMENTO}`:'Novo equipamento';
   const base = r || {CLIENTE:single('CLIENTE'),UNIDADE:single('UNIDADE'),REGIÃO:single('REGIÃO')};
   $('#fBody').innerHTML = COLS.map(c=>`<div class="field"><label>${c}</label><input name="${c}" ${DATE_COLS.includes(c)?'type="date"':''} list="dl-${norm(c).replace(/\W/g,'')}" value="${esc(base[c]??'')}" ${['CLIENTE','UNIDADE','EQUIPAMENTO'].includes(c)?'required':''}></div>`).join('')
     + ["CLIENTE","UNIDADE","CATEGORIA","RESPONSAVÉL","REGIÃO","EQUIPAMENTO"].map(c=>`<datalist id="dl-${norm(c).replace(/\W/g,'')}">${uniq(c).map(v=>`<option value="${esc(v)}">`).join('')}</datalist>`).join('');
@@ -646,9 +645,6 @@ async function saveForm(e){
   try{ await api('POST',{action:current?'update':'create',record:rec}); closeM('mForm'); toast(current?'Registro atualizado':'Registro criado'); await reload(true); }
   catch(err){ toast('Erro: '+err.message); } busy(false);
 }
-async function del(id){ const r=rows.find(x=>x.ID===id); if(!confirm(`Excluir ${r?.EQUIPAMENTO} (${r?.SERIAL})?`)) return;
-  busy(true); try{ await api('POST',{action:'delete',id}); closeM('mForm'); toast('Registro excluído'); await reload(true); }catch(err){ toast('Erro: '+err.message); } busy(false); }
-const delCurrent = () => current && del(current.ID);
 const closeM = id => $('#'+id).classList.remove('open');
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
 /* ======================= EXCEL ======================= */
