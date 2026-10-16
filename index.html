@@ -98,6 +98,64 @@ tr:hover td{background:#ffffff06}
 .toast.show{transform:none}
 .eq.salvando,tr.salvando{opacity:.55;animation:pulsar 1s ease-in-out infinite;pointer-events:none}
 @keyframes pulsar{50%{opacity:.3}}
+
+/* ======================= PÁGINA INICIAL ======================= */
+#hero{position:fixed;inset:0;z-index:100;display:flex;align-items:center;overflow:hidden;color:#fff;background:#060b16;
+  transition:opacity .6s ease,visibility .6s}
+#hero.saindo{opacity:0;visibility:hidden}
+#hero.fora{display:none}
+#hero:not(.com-foto){background:
+  radial-gradient(900px 520px at 85% 10%,#0ea5e944,transparent 60%),
+  radial-gradient(800px 500px at 10% 95%,#14b8a644,transparent 60%),
+  repeating-linear-gradient(0deg,#ffffff06 0 1px,transparent 1px 44px),
+  repeating-linear-gradient(90deg,#ffffff06 0 1px,transparent 1px 44px),#060b16}
+.hero-slides{position:absolute;inset:0}
+.hero-slide{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;transform:scale(1.04);
+  transition:opacity 1.4s ease,transform 9s linear}
+.hero-slide.on{opacity:1;transform:scale(1.12)}
+.hero-shade{position:absolute;inset:0;pointer-events:none;background:
+  linear-gradient(90deg,rgba(6,11,22,.94) 0%,rgba(6,11,22,.78) 40%,rgba(6,11,22,.30) 100%),
+  linear-gradient(0deg,rgba(6,11,22,.9) 0%,transparent 38%)}
+.hero-content{position:relative;z-index:2;width:100%;max-width:1040px;padding:0 clamp(22px,7vw,120px)}
+.hero-brand{display:flex;align-items:center;gap:12px;font-weight:800;font-size:19px;letter-spacing:-.02em}
+.hero-brand i{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--brand),var(--brand2));display:grid;place-items:center;font-style:normal;color:#04131a}
+.hero-eyebrow{margin:26px 0 12px;font-size:12px;font-weight:700;letter-spacing:.22em;color:var(--brand)}
+#hero h1{margin:0;font-size:clamp(32px,4.4vw,56px);line-height:1.06;letter-spacing:-.03em;font-weight:800}
+#hero h1 span{background:linear-gradient(90deg,var(--brand),var(--brand2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero-sub{margin:18px 0 0;max-width:600px;font-size:clamp(15px,1.5vw,18px);line-height:1.6;color:#cbd5e6}
+.hero-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:34px 0 0;max-width:720px}
+.hero-stat{padding:14px 16px;border-radius:14px;background:rgba(18,26,46,.55);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(10px)}
+.hero-stat b{display:block;font-size:clamp(22px,3vw,32px);font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.hero-stat small{display:block;margin-top:2px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#9fb0cc}
+.hero-stat.bad b{color:#fca5a5}.hero-stat.warn b{color:#fcd34d}.hero-stat.ok b{color:#86efac}
+.hero-cta{display:flex;align-items:center;flex-wrap:wrap;gap:16px;margin-top:34px}
+#heroGo{display:inline-flex;align-items:center;gap:10px;border:0;cursor:pointer;padding:15px 26px;border-radius:14px;font-weight:800;font-size:16px;
+  color:#04131a;background:linear-gradient(135deg,var(--brand),var(--brand2));box-shadow:0 14px 34px -12px #14b8a6aa;transition:.18s}
+#heroGo:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 18px 40px -12px #14b8a6dd}
+#heroGo:disabled{opacity:.75;cursor:progress}
+#heroGo .sp{width:16px;height:16px;border-radius:50%;border:2px solid #04131a55;border-top-color:#04131a;animation:s .8s linear infinite}
+#heroGo:not(:disabled) .sp{display:none}
+.hero-hint{font-size:13px;color:#9fb0cc}
+.hero-status{margin-top:18px;font-size:12.5px;color:#9fb0cc}
+.hero-status::before{content:"●";margin-right:7px;color:var(--warn)}
+.hero-status.live::before{color:var(--ok)}
+.hero-bottom{position:absolute;z-index:3;left:0;right:0;bottom:0;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:18px clamp(22px,4vw,48px)}
+.hero-credit{font-size:11.5px;color:#aab8d0;max-width:60%;line-height:1.4}
+.hero-credit a{color:#cfe3ff;text-decoration:underline;text-underline-offset:2px}
+.hero-ctl{display:flex;align-items:center;gap:10px}
+.hero-ctl>button{width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:rgba(18,26,46,.5);color:#fff;cursor:pointer;backdrop-filter:blur(6px)}
+.hero-ctl>button:hover{border-color:var(--brand)}
+.hero-dots{display:flex;gap:7px}
+.hero-dots button{width:9px;height:9px;padding:0;border-radius:99px;border:0;background:rgba(255,255,255,.35);cursor:pointer;transition:.25s}
+.hero-dots button.on{width:26px;background:var(--brand)}
+.logo{cursor:pointer}
+@media(max-width:640px){
+  .hero-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .hero-shade{background:linear-gradient(0deg,rgba(6,11,22,.96) 0%,rgba(6,11,22,.8) 55%,rgba(6,11,22,.45) 100%)}
+  .hero-credit{max-width:100%;font-size:10.5px}.hero-bottom{flex-direction:column;align-items:flex-start}
+  #hero{align-items:flex-start;overflow-y:auto}.hero-content{padding-top:34px;padding-bottom:120px}
+}
+@media(prefers-reduced-motion:reduce){.hero-slide{transition:opacity .4s;transform:none!important}#heroGo{transition:none}}
 #ver{position:fixed;right:8px;bottom:2px;font-size:10px;color:var(--muted);opacity:.65;pointer-events:none;z-index:5}
 #saving{position:fixed;left:20px;bottom:20px;background:var(--panel2);border:1px solid var(--line);padding:9px 14px;border-radius:12px;box-shadow:var(--shadow);font-size:13px;display:none;z-index:60}
 #saving.on{display:block}
@@ -244,8 +302,38 @@ a.btn,a.btn:visited{color:var(--text);text-decoration:none}   /* link 'Gerenciad
 </style>
 </head>
 <body>
+<section id="hero" role="dialog" aria-label="Página inicial — Patrimônio">
+  <div class="hero-slides" id="heroSlides"></div>
+  <div class="hero-shade"></div>
+  <div class="hero-content">
+    <div class="hero-brand"><i>◆</i>Patrimônio</div>
+    <div class="hero-eyebrow">GESTÃO DE EQUIPAMENTOS LABORATORIAIS</div>
+    <h1>Patrimônio e preventivas<br><span>sempre sob controle</span></h1>
+    <p class="hero-sub">Acompanhe equipamentos, prazos de manutenção preventiva e responsáveis de todos os clientes e unidades, com dados em tempo real da planilha.</p>
+    <div class="hero-stats" aria-live="polite">
+      <div class="hero-stat"><b id="hsTotal">–</b><small>Equipamentos</small></div>
+      <div class="hero-stat bad"><b id="hsVenc">–</b><small>Vencidas</small></div>
+      <div class="hero-stat warn"><b id="hsProx">–</b><small>Vencem em 30 dias</small></div>
+      <div class="hero-stat ok"><b id="hsOk">–</b><small>Em dia</small></div>
+    </div>
+    <div class="hero-cta">
+      <button type="button" id="heroGo" disabled><span class="sp"></span><span id="heroGoTxt">Carregando dados…</span><span aria-hidden="true">→</span></button>
+      <span class="hero-hint">ou pressione Enter</span>
+    </div>
+    <div class="hero-status" id="heroStatus">Conectando à planilha…</div>
+  </div>
+  <div class="hero-bottom">
+    <div class="hero-credit" id="heroCredit"></div>
+    <div class="hero-ctl">
+      <button type="button" id="heroPrev" aria-label="Imagem anterior">‹</button>
+      <div class="hero-dots" id="heroDots"></div>
+      <button type="button" id="heroNext" aria-label="Próxima imagem">›</button>
+    </div>
+  </div>
+</section>
+<script>try{ if(sessionStorage.getItem('pat_hero_visto') && !/[?&]inicio=1/.test(location.search)) document.getElementById('hero').classList.add('fora'); }catch(e){}</script>
 <header>
-  <div class="logo"><i>◆</i>Patrimônio</div>
+  <div class="logo" onclick="HERO.abrir()" title="Voltar à página inicial" role="button" tabindex="0"><i>◆</i>Patrimônio</div>
   <span id="mode" class="badge demo">Modo demonstração</span>
   <div class="search">
     <span>⌕</span>
@@ -300,7 +388,7 @@ a.btn,a.btn:visited{color:var(--text);text-decoration:none}   /* link 'Gerenciad
   <iframe class="pdf" id="pdfFrame"></iframe>
 </div></div>
 
-<div id="ver">v8.3 · 15/10/2026</div>
+<div id="ver">v9.0 · 15/10/2026</div>
 <div class="loader" id="loader"><div class="spin"></div></div>
 <div class="toast" id="toast"></div>
 
@@ -885,7 +973,142 @@ function buildPdf(){
 function openPdf(){ busy(true); setTimeout(()=>{ pdfDoc=buildPdf(); $('#pdfFrame').src=pdfDoc.output('bloburl'); $('#mPdf').classList.add('open'); busy(false); },30); }
 function downloadPdf(){ pdfDoc && pdfDoc.save(`patrimonio_${new Date().toISOString().slice(0,10)}.pdf`); }
 
-reload();
+/* ======================= PÁGINA INICIAL (carrossel + resumo) =======================
+   Fotos livres buscadas em tempo real no Wikimedia Commons (API aberta, sem chave). Só entram imagens com licença livre
+   (CC0, CC BY, CC BY-SA, domínio público), e o crédito do autor/licença aparece em cada foto. O resultado da busca fica
+   em cache por 6 h neste navegador (a ordem das fotos muda a cada acesso). Sem internet ou sem resultado, aparece um
+   fundo gráfico no lugar. Mostrada 1× por sessão; o logotipo do cabeçalho (ou ?inicio=1 na URL) reabre. */
+const HERO = (()=>{
+  const el = document.getElementById('hero');
+  const TERMOS = ['clinical laboratory analyzer','hematology analyzer','blood gas analyzer','medical laboratory equipment',
+                  'laboratory centrifuge','laboratory microscope','hospital laboratory automation','biomedical equipment maintenance'];
+  /* evita pessoas/pacientes, procedimentos, ilustrações e material histórico */
+  const BLOQUEIO = /(diagram|logo|\bmap\b|icon|chart|poster|drawing|painting|illustration|vintage|histor|(?<!\d)(18|19)\d\d(?!\d)|patient|surg|operating|baby|child|nurse|doctor|portrait|selfie|military|army|\bwar\b|ambulance|wound|autops|cadaver|dental|x-?ray|\bmri\b|ct scan|covid|vaccin|syringe|dissect|protest|people|staff|team)/i;
+  const LICENCA_LIVRE = /^(CC0|CC BY|Public domain|PD)/i;
+  const TTL = 6*60*60*1000, CACHE_KEY = 'pat_hero_cache_v1', MAX_FOTOS = 8, INTERVALO = 6500;
+  const S = {itens:[], i:-1, timer:null, pausa:false, iniciado:false};
+  const $id = i => document.getElementById(i);
+  const visivel = () => !el.classList.contains('fora') && !el.classList.contains('saindo');
+  const reduz = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const embaralhar = a => { for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+  const texto = html => { try{ return (new DOMParser().parseFromString(html||'','text/html').body.textContent||'').replace(/\s+/g,' ').trim().slice(0,70); }catch{ return ''; } };
+
+  function candidato(p){
+    const ii = p.imageinfo && p.imageinfo[0]; if(!ii) return null;
+    const m = ii.extmetadata || {}, lic = (m.LicenseShortName && m.LicenseShortName.value) || '';
+    const w = ii.width, h = ii.height;
+    if(ii.mime!=='image/jpeg' || !(w>=1600) || !(h>=900) || w/h<1.3 || w/h>2.4) return null;
+    if(!LICENCA_LIVRE.test(lic)) return null;
+    if(BLOQUEIO.test(p.title+' '+((m.Categories&&m.Categories.value)||''))) return null;
+    return {src:ii.thumburl||ii.url, pagina:ii.descriptionurl, autor:texto(m.Artist&&m.Artist.value), lic, titulo:p.title};
+  }
+  async function buscar(termo){
+    const q = new URLSearchParams({action:'query',format:'json',origin:'*',generator:'search',gsrnamespace:'6',gsrlimit:'24',
+      gsrsearch:termo+' filetype:bitmap',prop:'imageinfo',iiprop:'url|size|mime|extmetadata',iiurlwidth:'1600',
+      iiextmetadatafilter:'Artist|LicenseShortName|Categories'});
+    const ctl = new AbortController(), to = setTimeout(()=>ctl.abort(),7000);
+    try{
+      const j = await (await fetch('https://commons.wikimedia.org/w/api.php?'+q,{signal:ctl.signal})).json();
+      return embaralhar(Object.values((j.query&&j.query.pages)||{}).map(candidato).filter(Boolean));
+    }catch{ return []; } finally{ clearTimeout(to); }
+  }
+  async function candidatos(){
+    try{ const c=JSON.parse(localStorage.getItem(CACHE_KEY)||'null'); if(c && Date.now()-c.at<TTL && c.itens.length>=MAX_FOTOS) return c.itens; }catch{}
+    const listas = await Promise.all(TERMOS.map(buscar)), pool=[], vistos=new Set();
+    for(let k=0; pool.length<48 && listas.some(l=>k<l.length); k++)            // intercala os temas para variar
+      listas.forEach(l=>{ if(l[k] && !vistos.has(l[k].src)){ vistos.add(l[k].src); pool.push(l[k]); } });
+    try{ if(pool.length) localStorage.setItem(CACHE_KEY, JSON.stringify({at:Date.now(), itens:pool})); }catch{}
+    return pool;
+  }
+
+  function adicionar(c){
+    return new Promise(res=>{
+      const im = new Image();
+      im.onload = ()=>{
+        const d = document.createElement('div'); d.className='hero-slide'; d.style.backgroundImage=`url("${c.src.replace(/"/g,'%22')}")`;
+        $id('heroSlides').appendChild(d); S.itens.push({...c, el:d});
+        if(S.itens.length===1){ el.classList.add('com-foto'); mostrar(0); }
+        pontos(); agendar(); res(true);
+      };
+      im.onerror = ()=>res(false); im.src = c.src;
+    });
+  }
+  async function carregar(){
+    const pool = embaralhar([...(await candidatos())]);
+    await Promise.all(pool.slice(0,2).map(adicionar));
+    for(const c of pool.slice(2,16)){ if(S.itens.length>=MAX_FOTOS) break; await adicionar(c); }
+  }
+
+  function mostrar(n){
+    if(!S.itens.length) return; n = (n+S.itens.length)%S.itens.length; S.i = n;
+    S.itens.forEach((o,k)=>o.el.classList.toggle('on',k===n));
+    const o = S.itens[n], cr = $id('heroCredit'); cr.textContent='';
+    cr.append('Foto: '+(o.autor||'autor não informado')+' · '+o.lic+' · ');
+    const a = document.createElement('a'); a.href=o.pagina; a.target='_blank'; a.rel='noopener'; a.textContent='Wikimedia Commons'; cr.append(a);
+    pontos();
+  }
+  function pontos(){
+    const d = $id('heroDots'); d.innerHTML = S.itens.map((_,k)=>`<button type="button" data-k="${k}" aria-label="Imagem ${k+1}" class="${k===S.i?'on':''}"></button>`).join('');
+  }
+  function agendar(){
+    clearTimeout(S.timer);
+    if(S.itens.length<2 || S.pausa || document.hidden || !visivel()) return;
+    S.timer = setTimeout(()=>{ mostrar(S.i+1); agendar(); }, INTERVALO);
+  }
+  const ir = d => { mostrar(S.i+d); agendar(); };
+
+  /* ---- resumo ---- */
+  function contar(id, alvo){
+    const e = $id(id); if(reduz || alvo<2){ e.textContent = alvo.toLocaleString('pt-BR'); return; }
+    const t0 = performance.now();
+    (function passo(t){ const k=Math.min(1,(t-t0)/700); e.textContent=Math.round(alvo*(1-Math.pow(1-k,3))).toLocaleString('pt-BR'); if(k<1) requestAnimationFrame(passo); })(t0);
+  }
+  function resumo(){
+    if(!rows.length) return;
+    const d = filtered(), c = {vencida:0,proxima:0,emdia:0,sem:0}; d.forEach(r=>c[status(r)]++);
+    contar('hsTotal',d.length); contar('hsVenc',c.vencida); contar('hsProx',c.proxima); contar('hsOk',c.emdia);
+  }
+  function estado(){
+    const st = $id('heroStatus'), ok = rows.length>0;
+    st.className = 'hero-status '+(LIVE?'live':'demo');
+    st.textContent = ok ? $id('mode').textContent : 'Não foi possível carregar os dados agora. Entre no painel e use ↻ Atualizar.';
+    const b = $id('heroGo'); b.disabled = false; $id('heroGoTxt').textContent = 'Acessar painel';
+    if(visivel()) b.focus({preventScroll:true});
+  }
+
+  function entrar(){
+    try{ sessionStorage.setItem('pat_hero_visto','1'); }catch{}
+    el.classList.add('saindo'); document.body.style.overflow=''; clearTimeout(S.timer);
+    setTimeout(()=>{ if(el.classList.contains('saindo')) el.classList.add('fora'); },650);
+  }
+  function abrir(){
+    el.classList.remove('fora'); void el.offsetWidth; el.classList.remove('saindo');
+    document.body.style.overflow='hidden'; iniciar(); resumo(); estado(); agendar();
+  }
+  function iniciar(){ if(S.iniciado) return; S.iniciado = true; carregar().catch(()=>{}); }
+  function pronto(){ estado(); resumo(); }
+
+  /* ---- eventos ---- */
+  $id('heroGo').onclick = entrar;
+  $id('heroPrev').onclick = ()=>ir(-1); $id('heroNext').onclick = ()=>ir(1);
+  $id('heroDots').addEventListener('click', e=>{ const b=e.target.closest('button[data-k]'); if(b){ mostrar(+b.dataset.k); agendar(); } });
+  el.addEventListener('mouseenter',()=>{ S.pausa=true; clearTimeout(S.timer); });
+  el.addEventListener('mouseleave',()=>{ S.pausa=false; agendar(); });
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden) agendar(); });
+  let x0=null; el.addEventListener('pointerdown',e=>{ x0=e.clientX; });
+  el.addEventListener('pointerup',e=>{ if(x0!==null && Math.abs(e.clientX-x0)>50) ir(e.clientX<x0?1:-1); x0=null; });
+  document.addEventListener('keydown',e=>{
+    if(!visivel()) return;
+    if(e.key==='ArrowRight') ir(1); else if(e.key==='ArrowLeft') ir(-1);
+    else if((e.key==='Enter' || e.key==='Escape') && !e.target.closest('.hero-ctl') && !$id('heroGo').disabled){ e.preventDefault(); entrar(); }
+  });
+  /* se a leitura da planilha demorar demais, libera o botão mesmo assim */
+  setTimeout(()=>{ if($id('heroGo').disabled) estado(); }, 20000);
+
+  if(visivel()){ document.body.style.overflow='hidden'; iniciar(); }
+  return {abrir, entrar, pronto, _estado:S};
+})();
+reload().finally(()=>HERO.pronto());
 </script>
 <script>
 
