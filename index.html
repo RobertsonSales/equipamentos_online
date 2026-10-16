@@ -96,6 +96,10 @@ tr:hover td{background:#ffffff06}
 .field input:focus{border-color:var(--brand)}
 .toast{position:fixed;right:20px;bottom:20px;background:var(--panel2);border:1px solid var(--line);padding:12px 16px;border-radius:12px;box-shadow:var(--shadow);transform:translateY(120%);transition:.25s;z-index:60}
 .toast.show{transform:none}
+.eq.salvando,tr.salvando{opacity:.55;animation:pulsar 1s ease-in-out infinite;pointer-events:none}
+@keyframes pulsar{50%{opacity:.3}}
+#saving{position:fixed;left:20px;bottom:20px;background:var(--panel2);border:1px solid var(--line);padding:9px 14px;border-radius:12px;box-shadow:var(--shadow);font-size:13px;display:none;z-index:60}
+#saving.on{display:block}
 .loader{position:fixed;inset:0;background:#0c1222cc;display:none;place-items:center;z-index:70}
 .loader.on{display:grid}
 .spin{width:42px;height:42px;border:4px solid #ffffff22;border-top-color:var(--brand);border-radius:50%;animation:s 1s linear infinite}
@@ -338,10 +342,18 @@ const pill = st => `<span class="pill st-${st}">${ST[st]}</span>`;
 /* ======================= API ======================= */
 async function api(method, payload){
   if(!LIVE) return demo(method,payload);
-  const r = method==='GET' ? await fetch(API,{cache:'no-store'})
-    : await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-  const j = await r.json().catch(()=>({ok:false,error:'Resposta inválida ('+r.status+')'}));
-  if(!j.ok) throw new Error(j.error||('HTTP '+r.status));
+  /* e.ambiguo = true → a resposta não permite saber se o servidor gravou (timeout/504/queda de conexão) */
+  const erro=(msg,ambiguo)=>Object.assign(new Error(msg),{ambiguo});
+  const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),45000);
+  let r;
+  try{
+    r = method==='GET' ? await fetch(API,{cache:'no-store',signal:ctl.signal})
+      : await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:ctl.signal});
+  }catch(e){ throw erro(e.name==='AbortError'?'O servidor demorou demais para responder':'Falha de conexão', true); }
+  finally{ clearTimeout(t); }
+  const j = await r.json().catch(()=>null);
+  if(!j) throw erro(r.status>=500 ? 'O servidor demorou a responder ('+r.status+')' : 'Resposta inválida ('+r.status+')', r.status>=500);
+  if(!j.ok) throw erro(j.error||('HTTP '+r.status), r.status>=500);
   return method==='GET' ? j.data.rows : j.data;
 }
 async function probe(){
@@ -634,7 +646,7 @@ function renderTree(d){
   $('#tree').innerHTML = Object.entries(g).map(([cli,o])=>{ const all=Object.values(o.u).flat();
     return `<details open><summary><b>${esc(cli)}</b><span class="badge mono">${[...o.cnpj].filter(Boolean).map(esc).join(' · ')}</span><div class="spacer"></div>${stSummary(all)}<span class="badge">${Object.keys(o.u).length} unid. · ${all.length} equip.</span></summary>
     ${Object.entries(o.u).map(([u,l])=>`<details class="unit"><summary>▸ <b>${esc(u)}</b><div class="spacer"></div>${stSummary(l)}<span class="badge">${l.length} equip.</span></summary><div class="eqs">
-      ${l.map(r=>`<div class="eq" data-id="${esc(r.ID)}"><div style="display:flex;justify-content:space-between;gap:6px"><b>${esc(r.EQUIPAMENTO)}</b>${pill(status(r))}</div><span style="color:var(--muted)">${esc(r.CATEGORIA)} · <span class="mono">${esc(r.SERIAL)}</span></span><br><span style="color:var(--muted)">Próx.: ${br(r['PROX.'])} · ${esc(r['RESPONSAVÉL']||'—')}</span></div>`).join('')}
+      ${l.map(r=>`<div class="eq${pendentes.has(r.ID)?' salvando':''}" data-id="${esc(r.ID)}"><div style="display:flex;justify-content:space-between;gap:6px"><b>${esc(r.EQUIPAMENTO)}</b>${pill(status(r))}</div><span style="color:var(--muted)">${esc(r.CATEGORIA)} · <span class="mono">${esc(r.SERIAL)}</span></span><br><span style="color:var(--muted)">Próx.: ${br(r['PROX.'])} · ${esc(r['RESPONSAVÉL']||'—')}</span></div>`).join('')}
     </div></details>`).join('')}</details>`; }).join('') || '<div class="card">Nenhum resultado.</div>';
   $('#tree').querySelectorAll('.eq').forEach(el=>el.onclick=()=>openForm(rows.find(r=>r.ID===el.dataset.id)));
 }
@@ -642,15 +654,16 @@ function sorted(d){ const {k,d:dir}=state.sort; return [...d].sort((a,b)=>String
 function renderTable(d){
   $('#rowCount').textContent=`${d.length} de ${rows.length}`;
   $('#table').innerHTML = `<thead><tr>${TABLE_COLS.map(c=>`<th data-k="${c}">${c}${state.sort.k===c?(state.sort.d>0?' ↑':' ↓'):''}</th>`).join('')}<th>Status</th><th></th></tr></thead><tbody>
-  ${sorted(d).map(r=>`<tr>${TABLE_COLS.map(c=>`<td class="${['SERIAL','CD PAT'].includes(c)?'mono':''}">${DATE_COLS.includes(c)?br(r[c]):c==='UNIDADE'?`${esc(r[c]||'—')}${r.CNPJ?`<small class="cnpj-sub mono">CNPJ ${esc(r.CNPJ)}</small>`:''}`:esc(r[c]||'—')}</td>`).join('')}<td>${pill(status(r))}</td><td><button class="btn sm" data-e="${esc(r.ID)}">Editar</button></td></tr>`).join('')}</tbody>`;
+  ${sorted(d).map(r=>`<tr data-id="${esc(r.ID)}"${pendentes.has(r.ID)?' class="salvando"':''}>${TABLE_COLS.map(c=>`<td class="${['SERIAL','CD PAT'].includes(c)?'mono':''}">${DATE_COLS.includes(c)?br(r[c]):c==='UNIDADE'?`${esc(r[c]||'—')}${r.CNPJ?`<small class="cnpj-sub mono">CNPJ ${esc(r.CNPJ)}</small>`:''}`:esc(r[c]||'—')}</td>`).join('')}<td>${pill(status(r))}</td><td><button class="btn sm" data-e="${esc(r.ID)}">Editar</button></td></tr>`).join('')}</tbody>`;
   $('#table').querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{ state.sort={k:th.dataset.k,d:state.sort.k===th.dataset.k?-state.sort.d:1}; render(); });
   $('#table').querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>openForm(rows.find(r=>r.ID===b.dataset.e)));
 }
 
 /* ======================= CRUD ======================= */
-function openForm(r){
+function openForm(r, valores){
+  if(r && pendentes.has(r.ID)){ toast('Este registro ainda está sendo salvo. Aguarde um instante.'); return; }
   current = r||null; $('#fTitle').textContent = r?`Editar · ${r.EQUIPAMENTO}`:'Novo equipamento';
-  const base = r || {CLIENTE:single('CLIENTE'),UNIDADE:single('UNIDADE'),REGIÃO:single('REGIÃO')};
+  const base = valores || r || {CLIENTE:single('CLIENTE'),UNIDADE:single('UNIDADE'),REGIÃO:single('REGIÃO')};
   $('#fBody').innerHTML = COLS.map(c=>`<div class="field"><label>${c}</label><input name="${c}" ${DATE_COLS.includes(c)?'type="date"':''} list="dl-${norm(c).replace(/\W/g,'')}" value="${esc(base[c]??'')}" ${['CLIENTE','UNIDADE','EQUIPAMENTO'].includes(c)?'required':''}></div>`).join('')
     + ["CLIENTE","UNIDADE","CATEGORIA","RESPONSAVÉL","REGIÃO","EQUIPAMENTO"].map(c=>`<datalist id="dl-${norm(c).replace(/\W/g,'')}">${uniq(c).map(v=>`<option value="${esc(v)}">`).join('')}</datalist>`).join('');
   const prev=$('#fBody [name="PREV. ATUAL"]'), prox=$('#fBody [name="PROX."]'), cat=$('#fBody [name="CATEGORIA"]');
@@ -661,23 +674,65 @@ function openForm(r){
   recalc();
   $('#mForm').classList.add('open');
 }
+/* ---- Salvamento em segundo plano ----
+   O modal fecha na hora e a tela já mostra o registro atualizado (marcado como "salvando"); o envio à planilha
+   acontece depois, sem bloquear o painel. Se falhar, a alteração é desfeita e o formulário reabre com o que foi digitado. */
+const pendentes = new Set();
+const esperar = ms => new Promise(r=>setTimeout(r,ms));
+const salvarCache = () => { if(LIVE) gravarCache(rows.filter(r=>!String(r.ID).startsWith('tmp-'))); };
+function indicarSalvando(){
+  let el=$('#saving'); if(!el){ el=document.createElement('div'); el.id='saving'; document.body.appendChild(el); }
+  const n=pendentes.size; el.textContent=`Salvando ${n} registro${n>1?'s':''}…`; el.classList.toggle('on',n>0);
+}
+/* update é idempotente: se a resposta for ambígua (ex.: 504 da primeira chamada, que costuma ser lenta), repete */
+async function enviar(payload, tentativas){
+  for(let i=0;;i++){
+    try{ return await api('POST',payload); }
+    catch(e){ if(!e.ambiguo || payload.action!=='update' || i>=tentativas) throw e; await esperar(1500); }
+  }
+}
+async function recarregarSilencioso(){
+  try{ rows = normalizar(await api('GET')); salvarCache(); buildFilters(); render(); }
+  catch(e){ toast('Erro ao recarregar: '+e.message); }
+}
 async function saveForm(e){
-  e.preventDefault(); const rec={...(current||{})}; new FormData($('#form')).forEach((v,k)=>rec[k]=String(v).trim());
+  e.preventDefault();
+  const rec={...(current||{})}; new FormData($('#form')).forEach((v,k)=>rec[k]=String(v).trim());
   if(rec.SERIAL && rows.some(r=>r.ID!==rec.ID && String(r.SERIAL)===rec.SERIAL) && !confirm('Já existe um equipamento com este serial. Salvar mesmo assim?')) return;
-  rec['PROX.'] = calcProx(rec.CATEGORIA, rec['PREV. ATUAL']);        // valor local (exibição)
-  const payload = {...rec}; delete payload['PROX.'];                  // NÃO envia: a coluna PROX. é fórmula na planilha
-  busy(true);
+  rec['PROX.'] = calcProx(rec.CATEGORIA, rec['PREV. ATUAL']);            // valor local (exibição)
+  const payload = {...rec}; delete payload['PROX.'];                       // o Apps Script calcula e grava a PROX.
+  const novo = !current, antes = current ? {...current} : null, id = novo ? 'tmp-'+Date.now() : rec.ID;
+  if(novo) rec.ID = id;
+
+  pendentes.add(id); indicarSalvando();
+  if(novo) rows.push(rec); else { const i=rows.findIndex(r=>r.ID===id); if(i>=0) rows[i]=rec; }
+  closeM('mForm'); buildFilters(); render();                               // painel liberado imediatamente
+
   try{
-    const saved = await api('POST',{action:current?'update':'create',record:payload});
-    closeM('mForm');
-    if(current){                                                      // atualiza só este registro na memória
-      const i = rows.findIndex(r=>r.ID===current.ID); if(i>=0) rows[i] = {...rows[i], ...rec, ...(saved && typeof saved==='object' ? saved : {})};
-    } else if(saved && saved.ID){ rows.push({...rec, ...saved}); }
-    else { toast('Registro criado'); await reload(true); busy(false); return; }   // sem ID de retorno: recarrega
-    if(LIVE) gravarCache(rows);
-    buildFilters(); render(); toast(current?'Registro atualizado':'Registro criado');
-  }catch(err){ toast('Erro: '+err.message); }
-  busy(false);
+    const saved = await enviar({action:novo?'create':'update',record:payload}, novo?0:2);
+    const srv = saved && typeof saved==='object' ? saved : {};
+    const i = rows.findIndex(r=>r.ID===id);
+    if(i>=0){
+      const mudou = novo || Object.keys(srv).some(k=>String(srv[k]??'')!==String(rows[i][k]??''));
+      rows[i] = {...rows[i], ...srv};
+      if(novo && !srv.ID){ pendentes.delete(id); indicarSalvando(); toast('Registro criado'); await recarregarSilencioso(); return; }
+      pendentes.delete(id); indicarSalvando(); salvarCache();
+      if(mudou){ buildFilters(); render(); }
+      else document.querySelectorAll(`[data-id="${CSS.escape(id)}"]`).forEach(el=>el.classList.remove('salvando'));
+    } else { pendentes.delete(id); indicarSalvando(); }
+    toast(novo?'Registro criado':'Registro atualizado');
+  }catch(err){
+    pendentes.delete(id); indicarSalvando();
+    if(err.ambiguo){                                                       // não dá para saber se gravou: confere na planilha
+      toast('Não foi possível confirmar o salvamento ('+err.message+'). Recarregando da planilha para conferir…');
+      await recarregarSilencioso();
+    } else {                                                               // recusado pelo servidor: desfaz e devolve o formulário
+      if(novo) rows = rows.filter(r=>r.ID!==id); else { const i=rows.findIndex(r=>r.ID===id); if(i>=0) rows[i]=antes; }
+      buildFilters(); render();
+      toast('Não foi possível salvar: '+err.message+'. Suas alterações foram mantidas no formulário.');
+      openForm(antes, rec);
+    }
+  }
 }
 const closeM = id => $('#'+id).classList.remove('open');
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
